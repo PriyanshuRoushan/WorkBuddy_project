@@ -1,0 +1,21 @@
+<!doctype html>
+<html class="light" lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WorkBuddy | Creative Workspace</title>
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;700;800&amp;family=Geist:wght@400;500;700&amp;family=Karla:wght@500;700&amp;display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+  </head>
+  <body class="bg-background text-on-surface font-body-md overflow-hidden paper-texture">
+    <svg height="0" style="visibility: hidden; position: absolute;" width="0">
+      <filter id="rough-edge">
+        <feTurbulence baseFrequency="0.03" numOctaves="3" result="noise" type="fractalNoise"></feTurbulence>
+        <feDisplacementMap in="SourceGraphic" in2="noise" scale="3"></feDisplacementMap>
+      </filter>
+    </svg>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
