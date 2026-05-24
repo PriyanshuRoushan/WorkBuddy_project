@@ -21,6 +21,21 @@ api.interceptors.request.use(
   }
 );
 
+// Response interceptor to handle token expiry / invalidation
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response && error.response.status === 401) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      if (typeof window !== 'undefined') {
+        window.location.href = '/login';
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
 // Authentication endpoints
 export const login = (email, password) => 
   api.post('/auth/login', { email, password }).then(res => res.data);

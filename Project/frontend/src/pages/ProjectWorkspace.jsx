@@ -6,7 +6,11 @@ import {
   getProjectMessages, 
   getProjectNotes, 
   uploadFile, 
-  getTeamMembers 
+  getTeamMembers,
+  getTasks,
+  createTask,
+  updateTask,
+  deleteTask
 } from '../services/api';
 
 const ProjectWorkspace = () => {
@@ -46,6 +50,17 @@ const ProjectWorkspace = () => {
 
   // Whiteboard States
   const [activeColor, setActiveColor] = useState('primary-container'); // default yellow
+
+  // Project Tasks States
+  const [activeTab, setActiveTab] = useState('whiteboard'); // 'whiteboard' or 'tasks'
+  const [projectTasks, setProjectTasks] = useState([]);
+  const [showAddTaskForm, setShowAddTaskForm] = useState(false);
+  const [newTaskTitle, setNewTaskTitle] = useState('');
+  const [newTaskCategory, setNewTaskCategory] = useState('DESIGN');
+  const [newTaskAssignedTo, setNewTaskAssignedTo] = useState('');
+  const [newTaskDueDate, setNewTaskDueDate] = useState('');
+  const [taskFilterStatus, setTaskFilterStatus] = useState('ALL');
+  const [taskFilterCategory, setTaskFilterCategory] = useState('ALL');
 
   // Play a self-contained beep sound when @mentioned or new message arrives
   const playNotificationSound = () => {
@@ -98,6 +113,14 @@ const ProjectWorkspace = () => {
         // 4. Fetch whiteboard notes
         const boardNotes = await getProjectNotes(projectId);
         setNotes(boardNotes);
+
+        // 4.5 Fetch project tasks
+        try {
+          const tasksData = await getTasks(projectId);
+          setProjectTasks(tasksData || []);
+        } catch (tErr) {
+          console.error('Error fetching project tasks:', tErr);
+        }
 
         // 5. Establish Socket.IO Connection
         socketRef.current = io('http://localhost:3001');
@@ -207,6 +230,22 @@ const ProjectWorkspace = () => {
 
         socketRef.current.on('receive-delete-note', ({ noteId }) => {
           setNotes(prev => prev.filter(n => n.noteId !== noteId));
+        });
+
+        // Project Tasks Sync Listeners
+        socketRef.current.on('receive-create-task', (newTask) => {
+          setProjectTasks(prev => {
+            if (prev.some(t => t._id === newTask._id)) return prev;
+            return [newTask, ...prev];
+          });
+        });
+
+        socketRef.current.on('receive-update-task', (updatedTask) => {
+          setProjectTasks(prev => prev.map(t => t._id === updatedTask._id ? updatedTask : t));
+        });
+
+        socketRef.current.on('receive-delete-task', ({ taskId }) => {
+          setProjectTasks(prev => prev.filter(t => t._id !== taskId));
         });
 
         socketRef.current.on('error-message', ({ message }) => {
@@ -395,6 +434,105 @@ const ProjectWorkspace = () => {
     socketRef.current.emit('create-note', newNote);
   };
 
+  // Get all teammates assigned to this project (plus PM creator)
+  const getProjectTeammates = () => {
+    if (!project || !allTeammates) return [];
+    const collaboratorsImages = project.collaborators || [];
+    return allTeammates.filter(member => {
+      if (collaboratorsImages.includes(member.profileImage)) return true;
+      if (member.role === 'Project Manager') return true;
+      return false;
+    });
+  };
+
+  // Find teammate details by email
+  const getAssigneeDetails = (email) => {
+    if (!allTeammates) return null;
+    return allTeammates.find(m => m.email === email);
+  };
+
+  // Create Task
+  const handleCreateTask = async (e) => {
+    e.preventDefault();
+    if (!newTaskTitle.trim()) {
+      alert('Please enter a task title.');
+      return;
+    }
+
+    try {
+      const taskData = {
+        title: newTaskTitle,
+        category: newTaskCategory,
+        status: 'TO DO',
+        dueDate: newTaskDueDate || undefined,
+        assignedTo: newTaskAssignedTo || currentUser.email,
+        projectId
+      };
+
+      const savedTask = await createTask(taskData);
+      
+      // Sync locally and emit
+      setProjectTasks(prev => [savedTask, ...prev]);
+      if (socketRef.current) {
+        socketRef.current.emit('create-task', { projectId, task: savedTask });
+      }
+
+      // Reset form
+      setNewTaskTitle('');
+      setNewTaskCategory('DESIGN');
+      setNewTaskDueDate('');
+      setNewTaskAssignedTo('');
+      setShowAddTaskForm(false);
+    } catch (err) {
+      console.error('Error creating task:', err);
+      alert('Failed to create task.');
+    }
+  };
+
+  // Toggle Task Status (Complete/Incomplete)
+  const handleToggleTaskComplete = async (task) => {
+    try {
+      const newStatus = task.status === 'DONE' ? 'TO DO' : 'DONE';
+      const updated = await updateTask(task._id, { status: newStatus });
+
+      setProjectTasks(prev => prev.map(t => t._id === task._id ? updated : t));
+      if (socketRef.current) {
+        socketRef.current.emit('update-task', { projectId, task: updated });
+      }
+    } catch (err) {
+      console.error('Error toggling task completion:', err);
+    }
+  };
+
+  // Update Task Status directly
+  const handleTaskStatusChange = async (taskId, newStatus) => {
+    try {
+      const updated = await updateTask(taskId, { status: newStatus });
+
+      setProjectTasks(prev => prev.map(t => t._id === taskId ? updated : t));
+      if (socketRef.current) {
+        socketRef.current.emit('update-task', { projectId, task: updated });
+      }
+    } catch (err) {
+      console.error('Error updating task status:', err);
+    }
+  };
+
+  // Delete Task
+  const handleDeleteTask = async (taskId) => {
+    if (!confirm('Are you sure you want to delete this task?')) return;
+    try {
+      await deleteTask(taskId);
+
+      setProjectTasks(prev => prev.filter(t => t._id !== taskId));
+      if (socketRef.current) {
+        socketRef.current.emit('delete-task', { projectId, taskId });
+      }
+    } catch (err) {
+      console.error('Error deleting task:', err);
+    }
+  };
+
   // Note Drag mechanics (Custom lightweight mouse tracker)
   const handleDragStart = (e, note) => {
     if (note.isPinned) return;
@@ -545,165 +683,425 @@ const ProjectWorkspace = () => {
     );
   }
 
+  // Filter tasks for this project
+  const filteredProjectTasks = projectTasks.filter(task => {
+    const matchesStatus = taskFilterStatus === 'ALL' || task.status === taskFilterStatus;
+    const matchesCategory = taskFilterCategory === 'ALL' || task.category === taskFilterCategory;
+    return matchesStatus && matchesCategory;
+  });
+
   return (
     <div className="flex flex-col md:flex-row w-full h-[calc(100vh-4rem)] overflow-hidden">
-      {/* LEFT PANEL: Neubrutalist Whiteboard Canvas */}
+      {/* LEFT PANEL: Neubrutalist Whiteboard Canvas or Project Tasks */}
       <section className="flex-1 flex flex-col h-full bg-[#fbfaf8] border-r-4 border-on-background relative overflow-hidden">
-        {/* Canvas Toolbar */}
-        <div className="h-14 border-b-2 border-on-background bg-surface flex items-center justify-between px-6 z-10">
+        {/* Canvas/Tasks Toolbar */}
+        <div className="h-14 border-b-2 border-on-background bg-surface flex items-center justify-between px-6 z-10 shrink-0">
           <div className="flex items-center gap-3">
-            <span className="material-symbols-outlined text-primary">space_dashboard</span>
-            <h3 className="font-headline-sm">{project?.title} - Board</h3>
+            <span className="material-symbols-outlined text-primary">
+              {activeTab === 'whiteboard' ? 'space_dashboard' : 'checklist'}
+            </span>
+            <h3 className="font-headline-sm truncate max-w-[150px] sm:max-w-xs">{project?.title}</h3>
           </div>
-          
-          <div className="flex items-center gap-4">
-            {/* Color preview selection */}
-            <div className="flex items-center gap-1.5 border-r-2 border-on-background pr-4 mr-1">
-              {['primary-container', 'secondary-container', 'tertiary-container', 'error-container', 'bg-white'].map((col) => {
-                const colorMap = {
-                  'primary-container': 'bg-primary-container',
-                  'secondary-container': 'bg-secondary-container',
-                  'tertiary-container': 'bg-tertiary-container',
-                  'error-container': 'bg-error-container',
-                  'bg-white': 'bg-white border border-on-background/20'
-                };
-                return (
-                  <button
-                    key={col}
-                    onClick={() => setActiveColor(col)}
-                    className={`w-6 h-6 rounded-full cursor-pointer ${colorMap[col]} border-2 border-on-background transition-transform hover:scale-115 ${activeColor === col ? 'ring-2 ring-primary ring-offset-1 scale-110' : ''}`}
-                    title={`Select default note color: ${col}`}
-                  />
-                );
-              })}
-            </div>
 
-            <button
-              onClick={handleAddNote}
-              className="px-4 py-1.5 bg-secondary-container hover:bg-secondary border-2 border-on-background font-bold text-xs shadow-[2px_2px_0px_0px_#1c1b1b] active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer"
+          {/* Segmented Tab Switcher */}
+          <div className="flex border-2 border-on-background bg-white p-0.5 shadow-[2px_2px_0px_0px_#1c1b1b] rounded-md">
+            <button 
+              onClick={() => setActiveTab('whiteboard')}
+              className={`px-3 py-1.5 text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors ${activeTab === 'whiteboard' ? 'bg-primary-container text-on-primary-container border border-on-background shadow-[1px_1px_0px_0px_#1c1b1b] rounded' : 'text-on-surface-variant opacity-60 hover:opacity-100'}`}
             >
-              <span className="material-symbols-outlined text-sm font-bold">add</span>
-              <span>Add Note</span>
+              <span className="material-symbols-outlined text-sm">dashboard</span>
+              <span className="hidden sm:inline">Whiteboard</span>
+            </button>
+            <button 
+              onClick={() => setActiveTab('tasks')}
+              className={`px-3 py-1.5 text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors ${activeTab === 'tasks' ? 'bg-secondary-container text-on-secondary-container border border-on-background shadow-[1px_1px_0px_0px_#1c1b1b] rounded' : 'text-on-surface-variant opacity-60 hover:opacity-100'}`}
+            >
+              <span className="material-symbols-outlined text-sm">assignment</span>
+              <span className="hidden sm:inline">Tasks</span>
             </button>
           </div>
-        </div>
-
-        {/* Scrollable canvas area */}
-        <div 
-          className="flex-1 w-full relative overflow-auto p-8 select-none" 
-          style={{ 
-            backgroundImage: 'radial-gradient(#1c1b1b 1.5px, transparent 1.5px)', 
-            backgroundSize: '24px 24px',
-            cursor: 'grab' 
-          }}
-        >
-          {notes.map((note) => {
-            const colorClassMap = {
-              'primary-container': 'bg-primary-container',
-              'secondary-container': 'bg-secondary-container',
-              'tertiary-container': 'bg-tertiary-container',
-              'error-container': 'bg-error-container',
-              'bg-white': 'bg-white'
-            };
-            const currentBg = colorClassMap[note.color] || 'bg-primary-container';
-            
-            return (
-              <div
-                key={note.noteId}
-                onMouseDown={(e) => handleDragStart(e, note)}
-                className={`absolute ${currentBg} border-2 border-on-background shadow-[5px_5px_0px_0px_rgba(28,27,27,1)] p-4 flex flex-col justify-between transition-shadow hover:shadow-[7px_7px_0px_0px_rgba(28,27,27,1)]`}
-                style={{
-                  left: `${note.positionX}px`,
-                  top: `${note.positionY}px`,
-                  width: `${note.width || 180}px`,
-                  height: `${note.height || 180}px`,
-                  zIndex: note.isPinned ? 5 : 10,
-                  cursor: note.isPinned ? 'default' : 'move'
-                }}
-              >
-                {/* Note Header / Toolbar */}
-                <div className="flex justify-between items-center border-b border-on-background/10 pb-1 mb-2 select-none drag-header">
-                  <span className="font-annotation text-[9px] text-on-surface-variant font-bold truncate max-w-[80px]">
-                    by {note.createdBy.split(' ')[0]}
-                  </span>
-
-                  <div className="flex items-center gap-1">
-                    {/* Pin button */}
+          
+          {/* Header Action buttons based on active tab */}
+          {activeTab === 'whiteboard' ? (
+            <div className="flex items-center gap-2 sm:gap-4">
+              {/* Color preview selection */}
+              <div className="hidden lg:flex items-center gap-1.5 border-r-2 border-on-background pr-4 mr-1">
+                {['primary-container', 'secondary-container', 'tertiary-container', 'error-container', 'bg-white'].map((col) => {
+                  const colorMap = {
+                    'primary-container': 'bg-primary-container',
+                    'secondary-container': 'bg-secondary-container',
+                    'tertiary-container': 'bg-tertiary-container',
+                    'error-container': 'bg-error-container',
+                    'bg-white': 'bg-white border border-on-background/20'
+                  };
+                  return (
                     <button
-                      onClick={() => handleTogglePinNote(note.noteId, note.isPinned)}
-                      className="action-btn text-on-surface-variant hover:text-primary transition-colors cursor-pointer select-none"
-                      title={note.isPinned ? 'Unpin Note' : 'Pin Note'}
-                    >
-                      <span className={`material-symbols-outlined text-sm font-bold ${note.isPinned ? 'text-primary fill-1' : 'opacity-60'}`}>
-                        push_pin
-                      </span>
-                    </button>
-                    {/* Delete note */}
-                    <button
-                      onClick={() => handleDeleteNote(note.noteId)}
-                      className="action-btn text-on-surface-variant hover:text-error transition-colors cursor-pointer select-none"
-                      title="Delete Note"
-                    >
-                      <span className="material-symbols-outlined text-sm font-bold opacity-60 hover:opacity-100">
-                        close
-                      </span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Content Editable Area */}
-                <textarea
-                  value={note.content}
-                  onChange={(e) => handleNoteTextChange(note.noteId, e.target.value)}
-                  className="flex-1 bg-transparent resize-none border-none outline-none font-annotation text-xs font-bold leading-relaxed scrollbar-thin select-text text-on-surface"
-                  placeholder="Type note message..."
-                />
-
-                {/* Note Footer Colors Selection & Resize Handle */}
-                <div className="flex justify-between items-center mt-2 select-none border-t border-on-background/10 pt-1.5">
-                  <div className="flex items-center gap-1">
-                    {['primary-container', 'secondary-container', 'tertiary-container', 'bg-white'].map((col) => {
-                      const dotMap = {
-                        'primary-container': 'bg-primary-container',
-                        'secondary-container': 'bg-secondary-container',
-                        'tertiary-container': 'bg-tertiary-container',
-                        'bg-white': 'bg-white border border-on-background/25'
-                      };
-                      return (
-                        <button
-                          key={col}
-                          onClick={() => handleNoteColorChange(note.noteId, col)}
-                          className={`color-dot w-3 h-3 rounded-full cursor-pointer ${dotMap[col]} border border-on-background`}
-                        />
-                      );
-                    })}
-                  </div>
-
-                  {/* Drag diagonal resizing handle */}
-                  <div
-                    onMouseDown={(e) => handleResizeStart(e, note)}
-                    className="w-4 h-4 cursor-se-resize flex items-end justify-end select-none"
-                    title="Drag to resize note"
-                  >
-                    <span className="material-symbols-outlined text-xs text-on-surface-variant opacity-60">
-                      filter_list
-                    </span>
-                  </div>
-                </div>
+                      key={col}
+                      onClick={() => setActiveColor(col)}
+                      className={`w-6 h-6 rounded-full cursor-pointer ${colorMap[col]} border-2 border-on-background transition-transform hover:scale-115 ${activeColor === col ? 'ring-2 ring-primary ring-offset-1 scale-110' : ''}`}
+                      title={`Select default note color: ${col}`}
+                    />
+                  );
+                })}
               </div>
-            );
-          })}
 
-          {notes.length === 0 && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center text-center opacity-40 select-none pointer-events-none">
-              <span className="material-symbols-outlined text-[80px] text-on-background/30 mb-4 animate-bounce">
-                border_color
-              </span>
-              <p className="font-headline-sm">Click "Add Note" to populate the whiteboard!</p>
-              <p className="font-annotation text-xs mt-1">Changes sync in real-time between project members.</p>
+              <button
+                onClick={handleAddNote}
+                className="px-3 py-1 bg-secondary-container hover:bg-secondary border-2 border-on-background font-bold text-xs shadow-[2px_2px_0px_0px_#1c1b1b] active:scale-95 transition-all flex items-center gap-1 cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-xs font-bold">add</span>
+                <span>Add Note</span>
+              </button>
             </div>
+          ) : (
+            <button
+              onClick={() => setShowAddTaskForm(prev => !prev)}
+              className="px-3 py-1 bg-primary-container hover:bg-primary border-2 border-on-background font-bold text-xs shadow-[2px_2px_0px_0px_#1c1b1b] active:scale-95 transition-all flex items-center gap-1 cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-xs font-bold">
+                {showAddTaskForm ? 'close' : 'add'}
+              </span>
+              <span>{showAddTaskForm ? 'Cancel' : 'New Task'}</span>
+            </button>
           )}
         </div>
+
+        {activeTab === 'whiteboard' ? (
+          /* Scrollable canvas area */
+          <div 
+            className="flex-1 w-full relative overflow-auto p-8 select-none" 
+            style={{ 
+              backgroundImage: 'radial-gradient(#1c1b1b 1.5px, transparent 1.5px)', 
+              backgroundSize: '24px 24px',
+              cursor: 'grab' 
+            }}
+          >
+            {notes.map((note) => {
+              const colorClassMap = {
+                'primary-container': 'bg-primary-container',
+                'secondary-container': 'bg-secondary-container',
+                'tertiary-container': 'bg-tertiary-container',
+                'error-container': 'bg-error-container',
+                'bg-white': 'bg-white'
+              };
+              const currentBg = colorClassMap[note.color] || 'bg-primary-container';
+              
+              return (
+                <div
+                  key={note.noteId}
+                  onMouseDown={(e) => handleDragStart(e, note)}
+                  className={`absolute ${currentBg} border-2 border-on-background shadow-[5px_5px_0px_0px_rgba(28,27,27,1)] p-4 flex flex-col justify-between transition-shadow hover:shadow-[7px_7px_0px_0px_rgba(28,27,27,1)]`}
+                  style={{
+                    left: `${note.positionX}px`,
+                    top: `${note.positionY}px`,
+                    width: `${note.width || 180}px`,
+                    height: `${note.height || 180}px`,
+                    zIndex: note.isPinned ? 5 : 10,
+                    cursor: note.isPinned ? 'default' : 'move'
+                  }}
+                >
+                  {/* Note Header / Toolbar */}
+                  <div className="flex justify-between items-center border-b border-on-background/10 pb-1 mb-2 select-none drag-header">
+                    <span className="font-annotation text-[9px] text-on-surface-variant font-bold truncate max-w-[80px]">
+                      by {note.createdBy.split(' ')[0]}
+                    </span>
+
+                    <div className="flex items-center gap-1">
+                      {/* Pin button */}
+                      <button
+                        onClick={() => handleTogglePinNote(note.noteId, note.isPinned)}
+                        className="action-btn text-on-surface-variant hover:text-primary transition-colors cursor-pointer select-none"
+                        title={note.isPinned ? 'Unpin Note' : 'Pin Note'}
+                      >
+                        <span className={`material-symbols-outlined text-sm font-bold ${note.isPinned ? 'text-primary fill-1' : 'opacity-60'}`}>
+                          push_pin
+                        </span>
+                      </button>
+                      {/* Delete note */}
+                      <button
+                        onClick={() => handleDeleteNote(note.noteId)}
+                        className="action-btn text-on-surface-variant hover:text-error transition-colors cursor-pointer select-none"
+                        title="Delete Note"
+                      >
+                        <span className="material-symbols-outlined text-sm font-bold opacity-60 hover:opacity-100">
+                          close
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Content Editable Area */}
+                  <textarea
+                    value={note.content}
+                    onChange={(e) => handleNoteTextChange(note.noteId, e.target.value)}
+                    className="flex-1 bg-transparent resize-none border-none outline-none font-annotation text-xs font-bold leading-relaxed scrollbar-thin select-text text-on-surface"
+                    placeholder="Type note message..."
+                  />
+
+                  {/* Note Footer Colors Selection & Resize Handle */}
+                  <div className="flex justify-between items-center mt-2 select-none border-t border-on-background/10 pt-1.5">
+                    <div className="flex items-center gap-1">
+                      {['primary-container', 'secondary-container', 'tertiary-container', 'bg-white'].map((col) => {
+                        const dotMap = {
+                          'primary-container': 'bg-primary-container',
+                          'secondary-container': 'bg-secondary-container',
+                          'tertiary-container': 'bg-tertiary-container',
+                          'bg-white': 'bg-white border border-on-background/25'
+                        };
+                        return (
+                          <button
+                            key={col}
+                            onClick={() => handleNoteColorChange(note.noteId, col)}
+                            className={`color-dot w-3 h-3 rounded-full cursor-pointer ${dotMap[col]} border border-on-background`}
+                          />
+                        );
+                      })}
+                    </div>
+
+                    {/* Drag diagonal resizing handle */}
+                    <div
+                      onMouseDown={(e) => handleResizeStart(e, note)}
+                      className="w-4 h-4 cursor-se-resize flex items-end justify-end select-none"
+                      title="Drag to resize note"
+                    >
+                      <span className="material-symbols-outlined text-xs text-on-surface-variant opacity-60">
+                        filter_list
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+
+            {notes.length === 0 && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center text-center opacity-40 select-none pointer-events-none">
+                <span className="material-symbols-outlined text-[80px] text-on-background/30 mb-4 animate-bounce">
+                  border_color
+                </span>
+                <p className="font-headline-sm">Click "Add Note" to populate the whiteboard!</p>
+                <p className="font-annotation text-xs mt-1">Changes sync in real-time between project members.</p>
+              </div>
+            )}
+          </div>
+        ) : (
+          /* Tasks checklist layout */
+          <div className="flex-1 w-full overflow-y-auto p-6 bg-[#fcfcfa] flex flex-col select-text">
+            {/* Add Task Card Form */}
+            {showAddTaskForm && (
+              <form onSubmit={handleCreateTask} className="bg-white border-2 border-on-background p-5 mb-6 shadow-[4px_4px_0px_0px_rgba(28,27,27,1)] relative rotate-[-0.5deg] shrink-0 z-20">
+                <div className="tape-accent !bg-primary-container/20"></div>
+                <h4 className="font-bold text-xs mb-4 font-annotation uppercase tracking-wider text-primary">Create Project Task</h4>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block font-label-caps text-[10px] text-on-surface-variant mb-1">Task Title</label>
+                    <input 
+                      type="text"
+                      value={newTaskTitle}
+                      onChange={(e) => setNewTaskTitle(e.target.value)}
+                      placeholder="e.g. Implement user login form"
+                      className="w-full p-2 border-2 border-on-background focus:ring-0 focus:border-primary outline-none font-bold text-xs bg-white"
+                      required
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block font-label-caps text-[10px] text-on-surface-variant mb-1">Category</label>
+                      <select 
+                        value={newTaskCategory}
+                        onChange={(e) => setNewTaskCategory(e.target.value)}
+                        className="w-full p-2 border-2 border-on-background bg-white outline-none font-bold text-xs"
+                      >
+                        <option value="DESIGN">DESIGN</option>
+                        <option value="BUG">BUG</option>
+                        <option value="API">API</option>
+                        <option value="MARKETING">MARKETING</option>
+                        <option value="CORE">CORE</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block font-label-caps text-[10px] text-on-surface-variant mb-1">Assignee</label>
+                      <select 
+                        value={newTaskAssignedTo}
+                        onChange={(e) => setNewTaskAssignedTo(e.target.value)}
+                        className="w-full p-2 border-2 border-on-background bg-white outline-none font-bold text-xs"
+                      >
+                        <option value="">Self (or select teammate)</option>
+                        {getProjectTeammates().map(m => (
+                          <option key={m._id} value={m.email}>{m.name} ({m.role})</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block font-label-caps text-[10px] text-on-surface-variant mb-1">Due Date</label>
+                      <input 
+                        type="date"
+                        value={newTaskDueDate}
+                        onChange={(e) => setNewTaskDueDate(e.target.value)}
+                        className="w-full p-2 border-2 border-on-background outline-none font-bold text-xs bg-white"
+                      />
+                    </div>
+                  </div>
+                  <button 
+                    type="submit"
+                    className="w-full py-2.5 bg-primary-container hover:bg-primary border-2 border-on-background font-bold text-xs shadow-[2px_2px_0px_0px_#1c1b1b] active:scale-95 transition-all flex items-center justify-center gap-1 cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-sm">check</span>
+                    <span>Create Task</span>
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* Filters Bar */}
+            <div className="bg-white p-4 border-2 border-on-background shadow-[3px_3px_0px_0px_rgba(28,27,27,0.08)] mb-6 flex flex-wrap gap-4 justify-between items-center rotate-[0.5deg] shrink-0">
+              <div className="flex flex-wrap gap-3 items-center">
+                <span className="font-label-caps text-[10px] text-on-surface-variant flex items-center gap-1 uppercase font-bold">
+                  <span className="material-symbols-outlined text-xs">filter_alt</span> Filters:
+                </span>
+                <select
+                  value={taskFilterStatus}
+                  onChange={(e) => setTaskFilterStatus(e.target.value)}
+                  className="p-1.5 border border-on-background bg-white text-xs font-bold focus:outline-none"
+                >
+                  <option value="ALL">All Statuses</option>
+                  <option value="TO DO">TO DO</option>
+                  <option value="IN PROGRESS">IN PROGRESS</option>
+                  <option value="DONE">DONE</option>
+                </select>
+                <select
+                  value={taskFilterCategory}
+                  onChange={(e) => setTaskFilterCategory(e.target.value)}
+                  className="p-1.5 border border-on-background bg-white text-xs font-bold focus:outline-none"
+                >
+                  <option value="ALL">All Categories</option>
+                  <option value="DESIGN">DESIGN</option>
+                  <option value="BUG">BUG</option>
+                  <option value="API">API</option>
+                  <option value="MARKETING">MARKETING</option>
+                  <option value="CORE">CORE</option>
+                </select>
+              </div>
+              <div className="font-annotation text-[10px] font-bold text-on-surface-variant opacity-70">
+                {filteredProjectTasks.length} task{filteredProjectTasks.length !== 1 && 's'} listed
+              </div>
+            </div>
+
+            {/* Ruled Paper checklist area */}
+            <div className="bg-white border-2 border-on-background shadow-[4px_4px_0px_0px_rgba(28,27,27,0.05)] rounded flex-grow overflow-hidden flex flex-col min-h-[300px]">
+              {filteredProjectTasks.length > 0 ? (
+                <div className="divide-y-2 divide-dotted divide-on-background/10 overflow-y-auto flex-1 max-h-[calc(100vh-20rem)]">
+                  {filteredProjectTasks.map((task) => {
+                    const assignee = getAssigneeDetails(task.assignedTo);
+                    
+                    // Format due date
+                    const dueText = task.dueDate ? new Date(task.dueDate).toLocaleDateString([], { month: 'short', day: 'numeric' }) : 'No due date';
+                    const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'DONE';
+
+                    const getTaskBadgeClass = (category) => {
+                      switch (category) {
+                        case 'DESIGN': return 'bg-primary-container text-on-primary-container';
+                        case 'BUG': return 'bg-error-container text-on-error-container';
+                        case 'API': return 'bg-secondary-container text-on-secondary-container';
+                        default: return 'bg-tertiary-container text-on-tertiary-container';
+                      }
+                    };
+
+                    return (
+                      <div 
+                        key={task._id} 
+                        className={`p-4 flex items-center justify-between gap-4 transition-all hover:bg-surface-container-low group ${task.status === 'DONE' ? 'bg-surface-container-low/30' : ''}`}
+                      >
+                        <div className="flex items-center gap-3.5 flex-grow min-w-0">
+                          {/* Neubrutalist checkbox */}
+                          <button
+                            onClick={() => handleToggleTaskComplete(task)}
+                            className="w-6 h-6 rounded border-2 border-on-background flex items-center justify-center shrink-0 cursor-pointer hover:bg-primary-container/20 transition-all bg-white shadow-[1px_1px_0px_0px_#1c1b1b] active:scale-95"
+                          >
+                            {task.status === 'DONE' && (
+                              <span className="material-symbols-outlined text-primary font-bold text-base select-none">
+                                check
+                              </span>
+                            )}
+                          </button>
+
+                          <div className="min-w-0 flex-grow">
+                            <p className={`font-body-md font-bold text-on-surface text-sm break-words ${task.status === 'DONE' ? 'line-through text-on-surface-variant opacity-60' : ''}`}>
+                              {task.title}
+                            </p>
+                            <div className="flex flex-wrap items-center gap-3 mt-1.5">
+                              <span className={`px-2 py-0.5 border border-on-background text-[9px] font-bold rounded-full ${getTaskBadgeClass(task.category)}`}>
+                                {task.category}
+                              </span>
+                              
+                              <span className="font-annotation text-[10px] text-on-surface-variant opacity-60">Status:</span>
+                              <select
+                                value={task.status}
+                                onChange={(e) => handleTaskStatusChange(task._id, e.target.value)}
+                                className="bg-transparent border-b border-on-background/30 text-[10px] font-bold py-0.5 focus:ring-0 focus:border-primary outline-none cursor-pointer"
+                              >
+                                <option value="TO DO">TO DO</option>
+                                <option value="IN PROGRESS">IN PROGRESS</option>
+                                <option value="DONE">DONE</option>
+                              </select>
+
+                              <span className="font-annotation text-[10px] text-on-surface-variant opacity-60">•</span>
+
+                              {/* Due Date Indicator */}
+                              <span className={`font-annotation text-[10px] font-bold flex items-center gap-1 ${isOverdue ? 'text-error animate-pulse' : 'text-on-surface-variant opacity-60'}`}>
+                                <span className="material-symbols-outlined text-[12px] font-bold">calendar_month</span>
+                                <span>{dueText}</span>
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Assignee and Action buttons */}
+                        <div className="flex items-center gap-3 shrink-0">
+                          {/* Assignee Avatar */}
+                          {assignee ? (
+                            <div className="flex items-center gap-1.5" title={`${assignee.name} (${assignee.role})`}>
+                              <img 
+                                src={assignee.profileImage} 
+                                alt={assignee.name} 
+                                className="w-7 h-7 rounded-full border border-on-background object-cover bg-white" 
+                              />
+                              <span className="hidden md:inline font-annotation text-[9px] text-on-surface-variant font-bold truncate max-w-[60px]">
+                                {assignee.name.split(' ')[0]}
+                              </span>
+                            </div>
+                          ) : (
+                            <div className="w-7 h-7 rounded-full border border-on-background bg-surface-container-high flex items-center justify-center font-annotation text-[10px] opacity-60" title="Unassigned">
+                              ?
+                            </div>
+                          )}
+
+                          {/* Delete button */}
+                          <button
+                            onClick={() => handleDeleteTask(task._id)}
+                            className="p-1.5 text-on-surface-variant hover:text-error rounded hover:bg-surface-container-high transition-all opacity-0 group-hover:opacity-100 cursor-pointer material-symbols-outlined text-sm font-bold"
+                            title="Scratch Task"
+                          >
+                            delete
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="p-12 text-center flex flex-col items-center justify-center flex-grow">
+                  <span className="material-symbols-outlined text-5xl text-on-surface-variant opacity-30 mb-3 animate-pulse">
+                    edit_note
+                  </span>
+                  <p className="font-headline-sm text-sm text-on-surface-variant">No sprint tasks here!</p>
+                  <p className="font-annotation text-[10px] text-on-surface-variant opacity-60 mt-1">
+                    Add a task using the "New Task" button to get started.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </section>
 
       {/* RIGHT PANEL: Neubrutalist Chat Room */}

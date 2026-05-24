@@ -341,22 +341,12 @@ const Projects = () => {
 
             {/* Workspace Button */}
             <div className="mt-6 pt-4 border-t-2 border-dashed border-on-background/10">
-              {isPM || (project.collaborators && project.collaborators.includes(user?.profileImage)) ? (
-                <Link
-                  to={`/projects/${project._id}/workspace`}
-                  className="w-full block text-center py-2 bg-secondary-container hover:bg-secondary border-2 border-on-background font-bold text-sm shadow-[3px_3px_0px_0px_rgba(28,27,27,1)] hover:shadow-none hover:translate-x-[3px] hover:translate-y-[3px] transition-all cursor-pointer"
-                >
-                  Project Workspace 🚀
-                </Link>
-              ) : (
-                <button
-                  disabled
-                  className="w-full text-center py-2 bg-surface-container-high border-2 border-on-background text-on-surface-variant font-bold text-sm opacity-50 cursor-not-allowed"
-                  title="You are not a member of this project workspace"
-                >
-                  Workspace Locked 🔒
-                </button>
-              )}
+              <Link
+                to={`/projects/${project._id}/workspace`}
+                className="w-full block text-center py-2 bg-secondary-container hover:bg-secondary border-2 border-on-background font-bold text-sm shadow-[3px_3px_0px_0px_rgba(28,27,27,1)] hover:shadow-none hover:translate-x-[3px] hover:translate-y-[3px] transition-all cursor-pointer"
+              >
+                Project Workspace 🚀
+              </Link>
             </div>
           </div>
         ))}
