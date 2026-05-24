@@ -321,14 +321,14 @@ const Team = () => {
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-full border border-on-background bg-white flex items-center justify-center font-bold text-xs">MA</div>
                 <div className="flex-grow">
-                  <p className="text-sm font-bold leading-tight">Marcus A.</p>
+                  <p className="text-sm font-bold leading-tight">Manish A.</p>
                   <p className="text-[10px] uppercase text-on-surface-variant">Tomorrow</p>
                 </div>
               </div>
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-full border border-on-background bg-white flex items-center justify-center font-bold text-xs">JS</div>
                 <div className="flex-grow">
-                  <p className="text-sm font-bold leading-tight">Jenny Sia</p>
+                  <p className="text-sm font-bold leading-tight">Jyoti Sharma</p>
                   <p className="text-[10px] uppercase text-on-surface-variant">August 24</p>
                 </div>
               </div>
@@ -362,7 +362,7 @@ const Team = () => {
                   value={memberName}
                   onChange={(e) => setMemberName(e.target.value)}
                   className="w-full p-2 border-2 border-on-background rounded focus:ring-0 focus:border-primary outline-none"
-                  placeholder="e.g. Jenny Sia"
+                  placeholder="e.g. Jyoti Sharma"
                   required
                 />
               </div>
@@ -386,7 +386,7 @@ const Team = () => {
                   value={memberEmail}
                   onChange={(e) => setMemberEmail(e.target.value)}
                   className="w-full p-2 border-2 border-on-background rounded focus:ring-0 focus:border-primary outline-none"
-                  placeholder="e.g. jenny@workbuddy.com"
+                  placeholder="e.g. jyoti@workbuddy.com"
                   required
                 />
               </div>
@@ -427,7 +427,7 @@ const Team = () => {
                   value={noteAuthor}
                   onChange={(e) => setNoteAuthor(e.target.value)}
                   className="w-full p-2 border-2 border-on-background rounded focus:ring-0 focus:border-primary outline-none"
-                  placeholder="e.g. jenny_s"
+                  placeholder="e.g. jyoti_s"
                   required
                 />
               </div>

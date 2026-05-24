@@ -61,10 +61,13 @@ const Dashboard = () => {
 
   // Custom greeting based on time of day
   const getGreeting = () => {
+    const userString = localStorage.getItem('user');
+    const user = userString ? JSON.parse(userString) : null;
+    const name = user ? user.name.split(' ')[0] : 'Creator';
     const hour = new Date().getHours();
-    if (hour < 12) return 'Good Morning, Creator!';
-    if (hour < 17) return 'Happy Afternoon, Creator!';
-    return 'Good Evening, Sketcher!';
+    if (hour < 12) return `Good Morning, ${name}!`;
+    if (hour < 17) return `Happy Afternoon, ${name}!`;
+    return `Good Evening, ${name}!`;
   };
 
   // Format activity timestamps
