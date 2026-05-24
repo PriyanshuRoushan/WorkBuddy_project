@@ -9,6 +9,7 @@ import Team from './pages/Team';
 import SignUp from './pages/SignUp';
 import Login from './pages/Login';
 import Settings from './pages/Settings';
+import ProjectWorkspace from './pages/ProjectWorkspace';
 
 // Route Guard component
 const AuthGuard = ({ children }) => {
@@ -38,6 +39,7 @@ function App() {
         >
           <Route index element={<Dashboard />} />
           <Route path="projects" element={<Projects />} />
+          <Route path="projects/:id/workspace" element={<ProjectWorkspace />} />
           <Route path="tasks" element={<Tasks />} />
           <Route path="calendar" element={<Calendar />} />
           <Route path="team" element={<Team />} />

@@ -42,7 +42,7 @@ export const updateProject = (id, projectData) => api.put(`/projects/${id}`, pro
 export const deleteProject = (id) => api.delete(`/projects/${id}`).then(res => res.data);
 
 // Tasks endpoints
-export const getTasks = () => api.get('/tasks').then(res => res.data);
+export const getTasks = (projectId) => api.get(projectId ? `/tasks?projectId=${projectId}` : '/tasks').then(res => res.data);
 export const createTask = (taskData) => api.post('/tasks', taskData).then(res => res.data);
 export const updateTask = (id, taskData) => api.put(`/tasks/${id}`, taskData).then(res => res.data);
 export const deleteTask = (id) => api.delete(`/tasks/${id}`).then(res => res.data);
@@ -62,5 +62,14 @@ export const inviteTeamMember = (memberData) => api.post('/team/members', member
 export const getStickyNotes = () => api.get('/team/notes').then(res => res.data);
 export const createStickyNote = (noteData) => api.post('/team/notes', noteData).then(res => res.data);
 export const deleteStickyNote = (id) => api.delete(`/team/notes/${id}`).then(res => res.data);
+
+// Collaboration endpoints
+export const getProjectMessages = (projectId) => api.get(`/collab/projects/${projectId}/messages`).then(res => res.data);
+export const getProjectNotes = (projectId) => api.get(`/collab/projects/${projectId}/notes`).then(res => res.data);
+export const uploadFile = (formData) => api.post('/collab/upload', formData, {
+  headers: {
+    'Content-Type': 'multipart/form-data'
+  }
+}).then(res => res.data);
 
 export default api;

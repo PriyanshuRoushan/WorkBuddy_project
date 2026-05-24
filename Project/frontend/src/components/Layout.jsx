@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Header from './Header';
-import { createProject, createTask } from '../services/api';
+import { createProject, createTask, getTeamMembers } from '../services/api';
 
 const Layout = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -14,6 +14,8 @@ const Layout = () => {
   const [projectDesc, setProjectDesc] = useState('');
   const [projectStatus, setProjectStatus] = useState('DRAFT');
   const [projectProgress, setProjectProgress] = useState(0);
+  const [teamMembers, setTeamMembers] = useState([]);
+  const [selectedCollaborators, setSelectedCollaborators] = useState([]);
 
   const [taskTitle, setTaskTitle] = useState('');
   const [taskCategory, setTaskCategory] = useState('DESIGN');
@@ -22,12 +24,27 @@ const Layout = () => {
   // Trigger page refreshes after data saves
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-  const handleOpenModal = () => {
+  const handleOpenModal = async () => {
     const userString = localStorage.getItem('user');
     const user = userString ? JSON.parse(userString) : null;
     const isPM = user && user.role === 'Project Manager';
     setModalType(isPM ? 'project' : 'task');
     setIsModalOpen(true);
+
+    try {
+      const data = await getTeamMembers();
+      setTeamMembers(data);
+    } catch (error) {
+      console.error('Error fetching team members for modal:', error);
+    }
+  };
+
+  const handleToggleCollaborator = (profileImage) => {
+    setSelectedCollaborators(prev => 
+      prev.includes(profileImage)
+        ? prev.filter(img => img !== profileImage)
+        : [...prev, profileImage]
+    );
   };
 
   const handleCloseModal = () => {
@@ -37,6 +54,7 @@ const Layout = () => {
     setProjectDesc('');
     setProjectStatus('DRAFT');
     setProjectProgress(0);
+    setSelectedCollaborators([]);
     setTaskTitle('');
     setTaskCategory('DESIGN');
     setTaskStatus('TO DO');
@@ -52,9 +70,7 @@ const Layout = () => {
           description: projectDesc,
           status: projectStatus,
           progress: Number(projectProgress),
-          collaborators: [
-            'https://lh3.googleusercontent.com/aida-public/AB6AXuBCKlzErB5bTRryWZ9kKt0oiK9DwbcHdLdJB9qybJhLy-dzJ5DM31amBATHedwlN3X9J7VD96TmCF3mFQcMczf8WTwvXqOHWAd44WpluP6efrp03TZotpx9kJuc2IrqAGsXcS_K6_GLEdcSkeQNN1f4J5thBvpNgg_chr5QC74edErxb-JF3PPjxApBzJtKa-NfCvyS-T1sD7yuzJb6-GlhxYHfE4AfkjDPYPfznuzdH46FkMEgleVV-s5nRecyZXxMB8TGuAAsSsJC'
-          ]
+          collaborators: selectedCollaborators
         });
       } else {
         if (!taskTitle.trim()) return alert('Please enter a task title');
@@ -139,9 +155,29 @@ const Layout = () => {
                     <textarea
                       value={projectDesc}
                       onChange={(e) => setProjectDesc(e.target.value)}
-                      className="w-full p-2 border-2 border-on-background rounded focus:ring-0 focus:border-primary outline-none h-24"
+                      className="w-full p-2 border-2 border-on-background rounded focus:ring-0 focus:border-primary outline-none h-20"
                       placeholder="Explain the project..."
                     />
+                  </div>
+                  <div>
+                    <label className="block font-label-caps text-label-caps uppercase text-on-surface-variant mb-2">Assign Team Members</label>
+                    <div className="max-h-32 overflow-y-auto border-2 border-on-background p-2 rounded space-y-2 bg-surface-container-lowest">
+                      {teamMembers.map(member => (
+                        <label key={member._id} className="flex items-center gap-2 text-xs font-bold cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={selectedCollaborators.includes(member.profileImage)}
+                            onChange={() => handleToggleCollaborator(member.profileImage)}
+                            className="rounded border-2 border-on-background text-primary focus:ring-primary focus:ring-offset-0 bg-transparent checked:bg-primary cursor-pointer w-4 h-4"
+                          />
+                          <img src={member.profileImage} alt={member.name} className="w-6 h-6 rounded-full border border-on-background object-cover" />
+                          <span>{member.name} ({member.role})</span>
+                        </label>
+                      ))}
+                      {teamMembers.length === 0 && (
+                        <p className="text-xs text-on-surface-variant italic">No teammates found.</p>
+                      )}
+                    </div>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>

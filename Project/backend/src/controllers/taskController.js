@@ -2,8 +2,15 @@ import Task from '../models/Task.js';
 import Activity from '../models/Activity.js';
 
 export const getTasks = async (req, res) => {
+  const { projectId } = req.query;
   try {
-    const tasks = await Task.find().sort({ updatedAt: -1 });
+    let query = {};
+    if (projectId) {
+      query.projectId = projectId;
+    } else {
+      query.assignedTo = req.user.email;
+    }
+    const tasks = await Task.find(query).sort({ updatedAt: -1 });
     res.json(tasks);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -11,14 +18,22 @@ export const getTasks = async (req, res) => {
 };
 
 export const createTask = async (req, res) => {
-  const { title, category, status, progress, dueDate } = req.body;
+  const { title, category, status, progress, dueDate, assignedTo, projectId } = req.body;
   try {
-    const task = new Task({ title, category, status, progress, dueDate });
+    const task = new Task({
+      title,
+      category,
+      status,
+      progress,
+      dueDate,
+      assignedTo: assignedTo || req.user.email,
+      projectId
+    });
     const savedTask = await task.save();
 
     // Log activity
     await Activity.create({
-      user: 'Creator',
+      user: req.user.name.split(' ')[0],
       action: 'created a new task',
       target: title,
       type: 'add'
@@ -53,7 +68,7 @@ export const updateTask = async (req, res) => {
 
     if (action) {
       await Activity.create({
-        user: 'Creator',
+        user: req.user.name.split(' ')[0],
         action,
         target: updatedTask.title,
         type: updatedTask.status === 'DONE' ? 'check' : 'add'
@@ -73,7 +88,7 @@ export const deleteTask = async (req, res) => {
 
     // Log activity
     await Activity.create({
-      user: 'Creator',
+      user: req.user.name.split(' ')[0],
       action: 'deleted task',
       target: task.title,
       type: 'system'

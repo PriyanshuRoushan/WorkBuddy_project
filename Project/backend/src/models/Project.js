@@ -26,6 +26,10 @@ const projectSchema = new mongoose.Schema({
   collaborators: {
     type: [String],
     default: []
+  },
+  creator: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
   }
 }, {
   timestamps: true

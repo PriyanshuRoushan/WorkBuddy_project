@@ -57,7 +57,38 @@ const Dashboard = () => {
   const completedTasksCount = tasks.filter(t => t.status === 'DONE').length;
   const productivityScore = tasks.length > 0 
     ? Math.round((completedTasksCount / tasks.length) * 100)
-    : 85; // Default fallback score
+    : 0; // Dynamic default score
+
+  // Upcoming deadlines calculation from user tasks
+  const upcomingDeadlines = tasks
+    .filter(t => t.dueDate && t.status !== 'DONE')
+    .map(t => ({
+      _id: t._id,
+      title: t.title,
+      dueDate: new Date(t.dueDate)
+    }))
+    .sort((a, b) => a.dueDate - b.dueDate)
+    .slice(0, 3);
+
+  const getMonthAbbr = (date) => {
+    return date.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
+  };
+
+  const getDayNumber = (date) => {
+    return date.getDate();
+  };
+
+  const getDaysRemainingText = (dueDate) => {
+    const now = new Date();
+    const d1 = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+    const d2 = Date.UTC(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate());
+    const diffDays = Math.floor((d2 - d1) / (1000 * 60 * 60 * 24));
+    
+    if (diffDays < 0) return 'Overdue!';
+    if (diffDays === 0) return 'Today!';
+    if (diffDays === 1) return 'Tomorrow!';
+    return `In ${diffDays} days!`;
+  };
 
   // Custom greeting based on time of day
   const getGreeting = () => {
@@ -307,36 +338,25 @@ const Dashboard = () => {
               Deadlines
             </h3>
             <ul className="space-y-6">
-              <li className="flex items-start gap-4 border-b border-on-background/10 pb-4">
-                <div className="w-12 h-12 bg-error-container border-2 border-on-background flex flex-col items-center justify-center shrink-0">
-                  <span className="font-bold text-xs">OCT</span>
-                  <span className="font-bold text-lg">24</span>
+              {upcomingDeadlines.map((deadline) => (
+                <li key={deadline._id} className="flex items-start gap-4 border-b border-on-background/10 pb-4 last:border-b-0 last:pb-0">
+                  <div className="w-12 h-12 bg-error-container border-2 border-on-background flex flex-col items-center justify-center shrink-0">
+                    <span className="font-bold text-xs">{getMonthAbbr(deadline.dueDate)}</span>
+                    <span className="font-bold text-lg">{getDayNumber(deadline.dueDate)}</span>
+                  </div>
+                  <div>
+                    <p className="font-body-md font-bold">{deadline.title}</p>
+                    <p className={`font-annotation text-annotation font-bold ${getDaysRemainingText(deadline.dueDate) === 'Overdue!' ? 'text-error' : ''}`}>
+                      {getDaysRemainingText(deadline.dueDate)}
+                    </p>
+                  </div>
+                </li>
+              ))}
+              {upcomingDeadlines.length === 0 && (
+                <div className="text-center py-6 font-annotation text-on-surface-variant opacity-60">
+                  No upcoming deadlines!
                 </div>
-                <div>
-                  <p className="font-body-md font-bold">Product Pitch</p>
-                  <p className="font-annotation text-annotation text-error font-bold">In 2 days!</p>
-                </div>
-              </li>
-              <li className="flex items-start gap-4 border-b border-on-background/10 pb-4">
-                <div className="w-12 h-12 bg-primary-container border-2 border-on-background flex flex-col items-center justify-center shrink-0">
-                  <span className="font-bold text-xs">OCT</span>
-                  <span className="font-bold text-lg">28</span>
-                </div>
-                <div>
-                  <p className="font-body-md font-bold">Client Review</p>
-                  <p className="font-annotation text-annotation">Next week</p>
-                </div>
-              </li>
-              <li className="flex items-start gap-4">
-                <div className="w-12 h-12 bg-surface-container border-2 border-on-background flex flex-col items-center justify-center shrink-0">
-                  <span className="font-bold text-xs">NOV</span>
-                  <span className="font-bold text-lg">02</span>
-                </div>
-                <div>
-                  <p className="font-body-md font-bold">Design Handoff</p>
-                  <p className="font-annotation text-annotation text-on-surface-variant">Scheduled</p>
-                </div>
-              </li>
+              )}
             </ul>
           </div>
 

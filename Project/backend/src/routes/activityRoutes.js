@@ -3,11 +3,12 @@ import {
   getActivities,
   createActivity
 } from '../controllers/activityController.js';
+import { protect } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
 router.route('/')
-  .get(getActivities)
-  .post(createActivity);
+  .get(protect, getActivities)
+  .post(protect, createActivity);
 
 export default router;

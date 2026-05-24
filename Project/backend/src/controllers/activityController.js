@@ -2,7 +2,17 @@ import Activity from '../models/Activity.js';
 
 export const getActivities = async (req, res) => {
   try {
-    const activities = await Activity.find().sort({ createdAt: -1 }).limit(15);
+    let query = {};
+    if (req.user && req.user.role !== 'Project Manager' && req.user.role !== 'Admin') {
+      const firstName = req.user.name.split(' ')[0];
+      query = {
+        $or: [
+          { user: firstName },
+          { user: 'System' }
+        ]
+      };
+    }
+    const activities = await Activity.find(query).sort({ createdAt: -1 }).limit(15);
     res.json(activities);
   } catch (error) {
     res.status(500).json({ message: error.message });

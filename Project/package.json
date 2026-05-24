@@ -1,0 +1,12 @@
+{
+  "name": "workbuddy-workspace",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "backend": "cd backend && npm run dev",
+    "frontend": "cd frontend && npm run dev",
+    "seed": "cd backend && npm run seed",
+    "test-db": "cd backend && node test-connection.js",
+    "start": "npx concurrently \"npm run backend\" \"npm run frontend\""
+  }
+}

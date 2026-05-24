@@ -11,7 +11,7 @@ import { protect, requireProjectManager } from '../middleware/authMiddleware.js'
 const router = express.Router();
 
 router.route('/')
-  .get(getProjects)
+  .get(protect, getProjects)
   .post(protect, requireProjectManager, createProject);
 
 router.route('/:id')

@@ -25,6 +25,14 @@ const taskSchema = new mongoose.Schema({
   },
   dueDate: {
     type: Date
+  },
+  assignedTo: {
+    type: String,
+    default: 'creator@workbuddy.com'
+  },
+  projectId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Project'
   }
 }, {
   timestamps: true

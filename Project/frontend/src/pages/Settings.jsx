@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
 import { getMe, updateProfile } from '../services/api';
 
@@ -8,6 +8,7 @@ const Settings = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const fileInputRef = useRef(null);
 
   // Form states
   const [name, setName] = useState('');
@@ -25,6 +26,27 @@ const Settings = () => {
   const [email, setEmail] = useState('');
   const [userId, setUserId] = useState('');
   const [joinedDate, setJoinedDate] = useState('');
+
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) { // limit to 5MB
+        setError('Image file is too large! Please choose an image smaller than 5MB.');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setProfileImage(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleEditPhotoClick = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -61,6 +83,7 @@ const Settings = () => {
       const payload = {
         name,
         bio,
+        profileImage,
         sketchStyle,
         gridDensity: Number(gridDensity),
         notifySparks,
@@ -78,6 +101,7 @@ const Settings = () => {
       
       // Update local storage
       localStorage.setItem('user', JSON.stringify({
+        _id: updatedUser._id,
         name: updatedUser.name,
         email: updatedUser.email,
         role: updatedUser.role,
@@ -150,10 +174,17 @@ const Settings = () => {
                   src={profileImage || 'https://lh3.googleusercontent.com/aida-public/AB6AXuBCKlzErB5bTRryWZ9kKt0oiK9DwbcHdLdJB9qybJhLy-dzJ5DM31amBATHedwlN3X9J7VD96TmCF3mFQcMczf8WTwvXqOHWAd44WpluP6efrp03TZotpx9kJuc2IrqAGsXcS_K6_GLEdcSkeQNN1f4J5thBvpNgg_chr5QC74edErxb-JF3PPjxApBzJtKa-NfCvyS-T1sD7yuzJb6-GlhxYHfE4AfkjDPYPfznuzdH46FkMEgleVV-s5nRecyZXxMB8TGuAAsSsJC'}
                 />
               </div>
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleImageChange}
+                accept="image/*"
+                className="hidden"
+              />
               <button
                 type="button"
                 className="absolute bottom-0 right-0 bg-primary p-2 rounded-full text-on-primary border-2 border-on-background hover:scale-110 transition-transform cursor-pointer"
-                onClick={() => alert('Profile image upload can be configured or linked to Gravatar!')}
+                onClick={handleEditPhotoClick}
               >
                 <span className="material-symbols-outlined text-sm">edit</span>
               </button>

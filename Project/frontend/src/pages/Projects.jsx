@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { useOutletContext } from 'react-router-dom';
-import { getProjects, updateProject, deleteProject } from '../services/api';
+import { useOutletContext, Link } from 'react-router-dom';
+import { getProjects, updateProject, deleteProject, getTeamMembers } from '../services/api';
 
 const Projects = () => {
   const { searchQuery, refreshTrigger, setRefreshTrigger } = useOutletContext();
@@ -8,6 +8,12 @@ const Projects = () => {
   const [loading, setLoading] = useState(true);
   const [editingProgressId, setEditingProgressId] = useState(null);
   const [tempProgress, setTempProgress] = useState(0);
+
+  // Manage collaborators modal states
+  const [isManageMembersOpen, setIsManageMembersOpen] = useState(false);
+  const [selectedProject, setSelectedProject] = useState(null);
+  const [projectCollaborators, setProjectCollaborators] = useState([]);
+  const [teamMembers, setTeamMembers] = useState([]);
 
   // Auth role check
   const userString = localStorage.getItem('user');
@@ -17,10 +23,14 @@ const Projects = () => {
   const fetchProjects = async () => {
     try {
       setLoading(true);
-      const data = await getProjects();
-      setProjects(data);
+      const [projData, teamData] = await Promise.all([
+        getProjects(),
+        getTeamMembers()
+      ]);
+      setProjects(projData);
+      setTeamMembers(teamData);
     } catch (error) {
-      console.error('Error fetching projects:', error);
+      console.error('Error fetching projects or team:', error);
     } finally {
       setLoading(false);
     }
@@ -81,6 +91,33 @@ const Projects = () => {
     }
   };
 
+  const handleManageCollaborators = (project) => {
+    setSelectedProject(project);
+    setProjectCollaborators(project.collaborators || []);
+    setIsManageMembersOpen(true);
+  };
+
+  const handleToggleProjectCollaborator = (profileImage) => {
+    setProjectCollaborators(prev => 
+      prev.includes(profileImage)
+        ? prev.filter(img => img !== profileImage)
+        : [...prev, profileImage]
+    );
+  };
+
+  const handleSaveProjectCollaborators = async () => {
+    if (!selectedProject) return;
+    try {
+      await updateProject(selectedProject._id, { collaborators: projectCollaborators });
+      setIsManageMembersOpen(false);
+      setSelectedProject(null);
+      setRefreshTrigger(prev => prev + 1);
+    } catch (err) {
+      console.error('Error saving project collaborators:', err);
+      alert('Error saving collaborators.');
+    }
+  };
+
   const filteredProjects = projects.filter(project =>
     project.title.toLowerCase().includes((searchQuery || '').toLowerCase()) ||
     project.description.toLowerCase().includes((searchQuery || '').toLowerCase())
@@ -117,7 +154,8 @@ const Projects = () => {
 
   const triggerNewProjectModal = () => {
     if (!isPM) return;
-    const sidebarButton = document.querySelector('aside button');
+    const buttons = document.querySelectorAll('aside button');
+    const sidebarButton = buttons[buttons.length - 1];
     if (sidebarButton) sidebarButton.click();
   };
 
@@ -181,7 +219,7 @@ const Projects = () => {
             <div className="tape-accent !bg-secondary-container/20"></div>
             
             {/* Delete button (displays on hover) */}
-            {isPM && (
+            {isPM && (!project.creator || project.creator === user?._id || project.creator?._id === user?._id) && (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -196,25 +234,39 @@ const Projects = () => {
 
             {/* Header info */}
             <div className="flex justify-between items-start mb-6">
-              <div className="flex -space-x-3">
-                {project.collaborators && project.collaborators.length > 0 ? (
-                  project.collaborators.map((col, idx) => (
-                    <img
-                      key={idx}
-                      className="w-10 h-10 rounded-full border-2 border-on-background object-cover"
-                      src={col}
-                      alt="Collaborator"
-                    />
-                  ))
-                ) : (
-                  <div className="w-10 h-10 rounded-full border-2 border-on-background bg-surface-container-high flex items-center justify-center font-label-caps">
-                    C
-                  </div>
-                )}
-                {project.collaborators && project.collaborators.length > 2 && (
-                  <div className="w-10 h-10 rounded-full border-2 border-on-background bg-surface-container-high flex items-center justify-center font-label-caps z-10">
-                    +{project.collaborators.length - 2}
-                  </div>
+              <div className="flex items-center gap-1.5">
+                <div className="flex -space-x-3">
+                  {project.collaborators && project.collaborators.length > 0 ? (
+                    project.collaborators.slice(0, 3).map((col, idx) => (
+                      <img
+                        key={idx}
+                        className="w-10 h-10 rounded-full border-2 border-on-background object-cover bg-white"
+                        src={col}
+                        alt="Collaborator"
+                      />
+                    ))
+                  ) : (
+                    <div className="w-10 h-10 rounded-full border-2 border-on-background bg-surface-container-high flex items-center justify-center font-label-caps text-xs">
+                      C
+                    </div>
+                  )}
+                  {project.collaborators && project.collaborators.length > 3 && (
+                    <div className="w-10 h-10 rounded-full border-2 border-on-background bg-surface-container-high flex items-center justify-center font-label-caps z-10 text-xs font-bold">
+                      +{project.collaborators.length - 3}
+                    </div>
+                  )}
+                </div>
+                {isPM && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleManageCollaborators(project);
+                    }}
+                    className="w-8 h-8 rounded-full border-2 border-on-background bg-primary-container text-on-primary-container flex items-center justify-center font-bold text-base hover:scale-110 active:scale-95 transition-transform cursor-pointer ml-1 select-none"
+                    title="Manage Collaborators"
+                  >
+                    +
+                  </button>
                 )}
               </div>
 
@@ -286,6 +338,26 @@ const Projects = () => {
                 ></div>
               </div>
             </div>
+
+            {/* Workspace Button */}
+            <div className="mt-6 pt-4 border-t-2 border-dashed border-on-background/10">
+              {isPM || (project.collaborators && project.collaborators.includes(user?.profileImage)) ? (
+                <Link
+                  to={`/projects/${project._id}/workspace`}
+                  className="w-full block text-center py-2 bg-secondary-container hover:bg-secondary border-2 border-on-background font-bold text-sm shadow-[3px_3px_0px_0px_rgba(28,27,27,1)] hover:shadow-none hover:translate-x-[3px] hover:translate-y-[3px] transition-all cursor-pointer"
+                >
+                  Project Workspace 🚀
+                </Link>
+              ) : (
+                <button
+                  disabled
+                  className="w-full text-center py-2 bg-surface-container-high border-2 border-on-background text-on-surface-variant font-bold text-sm opacity-50 cursor-not-allowed"
+                  title="You are not a member of this project workspace"
+                >
+                  Workspace Locked 🔒
+                </button>
+              )}
+            </div>
           </div>
         ))}
       </div>
@@ -311,6 +383,66 @@ const Projects = () => {
           </div>
         </div>
       </footer>
+
+      {/* Manage Collaborators Modal */}
+      {isManageMembersOpen && selectedProject && (
+        <div className="fixed inset-0 bg-on-background/40 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-white border-2 border-on-background shadow-[8px_8px_0px_0px_rgba(28,27,27,0.15)] max-w-md w-full p-8 relative rotate-[0.5deg]">
+            <div className="tape-accent !bg-primary-container/40"></div>
+            
+            <button 
+              onClick={() => {
+                setIsManageMembersOpen(false);
+                setSelectedProject(null);
+              }} 
+              className="absolute top-4 right-4 material-symbols-outlined text-on-surface-variant hover:text-primary transition-colors cursor-pointer select-none"
+            >
+              close
+            </button>
+
+            <h3 className="font-headline-sm text-headline-sm mb-6 border-b-2 border-dashed border-on-background/20 pb-4">
+              Manage Collaborators
+            </h3>
+            
+            <p className="text-xs font-annotation text-on-surface-variant mb-4">
+              Project: <span className="font-bold text-on-surface">{selectedProject.title}</span>
+            </p>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block font-label-caps text-label-caps uppercase text-on-surface-variant mb-2">Assign Team Members</label>
+                <div className="max-h-60 overflow-y-auto border-2 border-on-background p-3 rounded space-y-3 bg-surface-container-lowest">
+                  {teamMembers.map(member => (
+                    <label key={member._id} className="flex items-center gap-3 text-sm font-bold cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={projectCollaborators.includes(member.profileImage)}
+                        onChange={() => handleToggleProjectCollaborator(member.profileImage)}
+                        className="rounded border-2 border-on-background text-primary focus:ring-primary focus:ring-offset-0 bg-transparent checked:bg-primary cursor-pointer w-4 h-4"
+                      />
+                      <img src={member.profileImage} alt={member.name} className="w-8 h-8 rounded-full border border-on-background object-cover bg-white" />
+                      <div>
+                        <p className="leading-none">{member.name}</p>
+                        <p className="text-[10px] text-on-surface-variant leading-none mt-1 font-annotation">{member.role}</p>
+                      </div>
+                    </label>
+                  ))}
+                  {teamMembers.length === 0 && (
+                    <p className="text-xs text-on-surface-variant italic">No teammates found.</p>
+                  )}
+                </div>
+              </div>
+
+              <button
+                onClick={handleSaveProjectCollaborators}
+                className="w-full py-3 bg-primary-container border-2 border-on-background rough-border font-bold text-headline-sm hover:jiggle active:scale-95 transition-all cursor-pointer mt-6 select-none"
+              >
+                Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

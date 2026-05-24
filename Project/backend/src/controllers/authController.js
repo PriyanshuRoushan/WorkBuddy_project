@@ -1,4 +1,7 @@
 import User from '../models/User.js';
+import TeamMember from '../models/TeamMember.js';
+import Project from '../models/Project.js';
+import ProjectMember from '../models/ProjectMember.js';
 import jwt from 'jsonwebtoken';
 
 // Helper to generate JWT Token
@@ -16,7 +19,33 @@ export const registerUser = async (req, res) => {
       return res.status(400).json({ message: 'User already exists' });
     }
 
-    const user = await User.create({ name, email, password, role });
+    // Resolve profileImage if they were invited in TeamMember
+    const teamMember = await TeamMember.findOne({ email });
+    let profileImage;
+    if (teamMember) {
+      profileImage = teamMember.profileImage;
+    }
+
+    const userFields = { name, email, password, role };
+    if (profileImage) {
+      userFields.profileImage = profileImage;
+    }
+
+    const user = await User.create(userFields);
+
+    // Auto-create ProjectMember records for any projects they are already collaborators on
+    if (profileImage) {
+      const matchingProjects = await Project.find({ collaborators: profileImage });
+      for (const project of matchingProjects) {
+        await ProjectMember.create({
+          projectId: project._id,
+          userId: user._id,
+          email: user.email,
+          role: user.role
+        }).catch(err => console.log('Auto project member mapping check skipped:', err.message));
+      }
+    }
+
     res.status(201).json({
       _id: user._id,
       name: user.name,
@@ -69,9 +98,13 @@ export const updateProfile = async (req, res) => {
     const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ message: 'User not found' });
 
+    const oldEmail = user.email;
+    const oldImage = user.profileImage;
+
     user.name = req.body.name || user.name;
     user.email = req.body.email || user.email;
     user.bio = req.body.bio !== undefined ? req.body.bio : user.bio;
+    user.profileImage = req.body.profileImage || user.profileImage;
     user.sketchStyle = req.body.sketchStyle || user.sketchStyle;
     user.gridDensity = req.body.gridDensity !== undefined ? req.body.gridDensity : user.gridDensity;
     user.notifySparks = req.body.notifySparks !== undefined ? req.body.notifySparks : user.notifySparks;
@@ -82,6 +115,24 @@ export const updateProfile = async (req, res) => {
     }
 
     const updatedUser = await user.save();
+
+    // 1. Sync update to TeamMember collection
+    const tmUpdate = { name: updatedUser.name, email: updatedUser.email, profileImage: updatedUser.profileImage };
+    await TeamMember.findOneAndUpdate({ email: oldEmail }, tmUpdate);
+
+    // 2. Sync profile image inside Project.collaborators array for all projects
+    if (oldImage !== updatedUser.profileImage) {
+      await Project.updateMany(
+        { collaborators: oldImage },
+        { $set: { "collaborators.$": updatedUser.profileImage } }
+      );
+    }
+
+    // 3. Sync changes inside ProjectMember objects
+    await ProjectMember.updateMany(
+      { userId: updatedUser._id },
+      { email: updatedUser.email, role: updatedUser.role }
+    );
     
     res.json({
       _id: updatedUser._id,
