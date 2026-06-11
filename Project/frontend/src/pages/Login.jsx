@@ -147,11 +147,11 @@ const Login = () => {
                 {loading ? (
                   <>
                     <span className="material-symbols-outlined animate-spin text-lg">progress_activity</span>
-                    <span>Opening Sketchbook...</span>
+                    <span>Opening WorkBuddy...</span>
                   </>
                 ) : (
                   <>
-                    <span>Let's Doodle!</span>
+                    <span>Login!</span>
                   </>
                 )}
               </button>
@@ -201,13 +201,13 @@ const Login = () => {
           <p className="font-body-md text-body-md text-on-surface-variant">
             New here?{' '}
             <Link to="/signup" className="text-secondary font-bold hover:underline transition-all">
-              Start scribbling
+              Sign Up
             </Link>
           </p>
           {/* Atmospheric Annotation */}
           <div className="flex justify-center items-center gap-2 opacity-60">
             <span className="material-symbols-outlined text-sm">verified</span>
-            <span className="font-annotation text-xs uppercase tracking-widest">Endless Canvas Guaranteed</span>
+            <span className="font-annotation text-xs uppercase tracking-widest">Created By Priyanshu Roushan</span>
           </div>
         </div>
       </main>

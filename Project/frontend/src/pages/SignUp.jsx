@@ -150,10 +150,10 @@ const SignUp = () => {
                 <span className="material-symbols-outlined text-primary text-3xl -rotate-45" data-icon="edit">edit</span>
               </div>
 
-              {/* Artist Name Field */}
+              {/* User Name Field */}
               <div className="input-group flex flex-col gap-1 relative">
                 <label className="font-label-caps text-on-surface-variant flex items-center gap-1 text-[11px]" htmlFor="artist-name">
-                  Artist Name <span className="text-error font-annotation text-sm">*</span>
+                  User Name <span className="text-error font-annotation text-sm">*</span>
                 </label>
                 <input
                   id="artist-name"
@@ -169,10 +169,10 @@ const SignUp = () => {
                 <div className="scribble-underline h-1 w-full mt-[-2px]"></div>
               </div>
 
-              {/* Creative Email Field */}
+              {/* Company Email Field */}
               <div className="input-group flex flex-col gap-1 relative">
                 <label className="font-label-caps text-on-surface-variant flex items-center gap-1 text-[11px]" htmlFor="creative-email">
-                  Creative Email <span className="text-error font-annotation text-sm">*</span>
+                  Company Email <span className="text-error font-annotation text-sm">*</span>
                 </label>
                 <input
                   id="creative-email"
@@ -188,10 +188,10 @@ const SignUp = () => {
                 <div className="scribble-underline h-1 w-full mt-[-2px]"></div>
               </div>
 
-              {/* Create a Scribble (Password) */}
+              {/* Set Password (Password) */}
               <div className="input-group flex flex-col gap-1 relative">
                 <label className="font-label-caps text-on-surface-variant flex items-center gap-1 text-[11px]" htmlFor="password">
-                  Create a Scribble <span className="text-error font-annotation text-sm">*</span>
+                  Set Password <span className="text-error font-annotation text-sm">*</span>
                 </label>
                 <div className="relative">
                   <input

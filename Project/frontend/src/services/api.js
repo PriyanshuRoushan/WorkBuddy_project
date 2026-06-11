@@ -1,7 +1,7 @@
 import axios from 'axios';
-
+import {CONSTANT} from '../../constant';
 const api = axios.create({
-  baseURL: 'http://localhost:3001/api',
+  baseURL: CONSTANT.ENV === "production" ? CONSTANT.API_URL : "http://localhost:3001/api" ,
   headers: {
     'Content-Type': 'application/json'
   }
