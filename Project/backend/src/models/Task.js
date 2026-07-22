@@ -1,6 +1,11 @@
 import mongoose from 'mongoose';
 
 const taskSchema = new mongoose.Schema({
+  organizationId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Organization',
+    index: true
+  },
   title: {
     type: String,
     required: true,
@@ -27,16 +32,37 @@ const taskSchema = new mongoose.Schema({
     type: Date
   },
   assignedTo: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  },
+  assignedToEmail: {
     type: String,
-    default: 'creator@workbuddy.com'
+    lowercase: true,
+    trim: true
   },
   projectId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Project'
+  },
+  requiredSkills: {
+    type: [String],
+    default: []
+  },
+  complexityScore: {
+    type: Number,
+    min: 1,
+    max: 5,
+    default: 1
+  },
+  completedAt: {
+    type: Date
   }
 }, {
   timestamps: true
 });
+
+taskSchema.index({ organizationId: 1, projectId: 1, status: 1 });
+taskSchema.index({ organizationId: 1, assignedTo: 1, status: 1 });
 
 const Task = mongoose.model('Task', taskSchema);
 export default Task;

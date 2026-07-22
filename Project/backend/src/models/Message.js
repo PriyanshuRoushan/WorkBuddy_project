@@ -1,6 +1,11 @@
 import mongoose from 'mongoose';
 
 const messageSchema = new mongoose.Schema({
+  organizationId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Organization',
+    index: true
+  },
   roomId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'ChatRoom',
@@ -10,6 +15,10 @@ const messageSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true
+  },
+  senderId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
   },
   senderName: {
     type: String,
@@ -34,6 +43,10 @@ const messageSchema = new mongoose.Schema({
   },
   reactions: [{
     user: String,
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
     emoji: String
   }],
   replyTo: {
@@ -45,6 +58,8 @@ const messageSchema = new mongoose.Schema({
     ref: 'User'
   }]
 }, { timestamps: true });
+
+messageSchema.index({ organizationId: 1, roomId: 1, createdAt: 1 });
 
 const Message = mongoose.model('Message', messageSchema);
 export default Message;

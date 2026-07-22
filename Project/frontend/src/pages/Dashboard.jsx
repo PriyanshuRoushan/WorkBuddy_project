@@ -1,6 +1,137 @@
 import React, { useEffect, useState } from 'react';
+import { DndContext, PointerSensor, useDroppable, useSensor, useSensors } from '@dnd-kit/core';
+import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { useOutletContext } from 'react-router-dom';
 import { getProjects, getTasks, getActivities, updateTask } from '../services/api';
+
+const TaskCard = ({ task, status, onMoveTask }) => {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: task._id,
+    data: { type: 'Task', columnId: status, task }
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.65 : 1
+  };
+
+  const borderClass = status === 'TO DO'
+    ? 'border-t-primary-container'
+    : status === 'IN PROGRESS'
+      ? 'border-t-secondary-container'
+      : 'border-t-tertiary-container';
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`bg-white p-4 rough-border doodle-card ${borderClass} relative group`}
+    >
+      <div className="flex justify-between items-start gap-2">
+        <p className="font-body-md font-bold text-on-surface">{task.title}</p>
+        <div className="flex items-center gap-1 shrink-0">
+          <button
+            type="button"
+            {...attributes}
+            {...listeners}
+            className="p-1 rounded hover:bg-surface-container-high material-symbols-outlined text-sm cursor-grab active:cursor-grabbing"
+            title="Drag card"
+            aria-label="Drag card"
+          >
+            drag_indicator
+          </button>
+          {status === 'TO DO' && (
+            <button
+              type="button"
+              onClick={() => onMoveTask(task._id, 'IN PROGRESS')}
+              className="p-1 rounded hover:bg-surface-container-high material-symbols-outlined text-sm cursor-pointer"
+              title="Move to In Progress"
+            >
+              arrow_forward
+            </button>
+          )}
+          {status === 'IN PROGRESS' && (
+            <>
+              <button
+                type="button"
+                onClick={() => onMoveTask(task._id, 'TO DO')}
+                className="p-1 rounded hover:bg-surface-container-high material-symbols-outlined text-sm cursor-pointer"
+                title="Move to Todo"
+              >
+                arrow_back
+              </button>
+              <button
+                type="button"
+                onClick={() => onMoveTask(task._id, 'DONE')}
+                className="p-1 rounded hover:bg-surface-container-high material-symbols-outlined text-sm cursor-pointer"
+                title="Move to Done"
+              >
+                check
+              </button>
+            </>
+          )}
+          {status === 'DONE' && (
+            <button
+              type="button"
+              onClick={() => onMoveTask(task._id, 'IN PROGRESS')}
+              className="p-1 rounded hover:bg-surface-container-high material-symbols-outlined text-sm cursor-pointer"
+              title="Move back to In Progress"
+            >
+              undo
+            </button>
+          )}
+        </div>
+      </div>
+      <div className="flex items-center gap-2 mt-4">
+        <span className="px-2 py-0.5 border border-on-background text-[10px] font-bold rounded-full bg-primary-container">
+          {task.category}
+        </span>
+        {status === 'IN PROGRESS' && (
+          <>
+            <div className="h-2 flex-grow bg-surface-container rounded-full overflow-hidden border border-on-background">
+              <div className="h-full bg-primary-container w-[45%]"></div>
+            </div>
+            <p className="font-annotation text-[10px] mt-1 italic">almost there...</p>
+          </>
+        )}
+        {status === 'DONE' && (
+          <>
+            <span className="material-symbols-outlined text-on-tertiary-container ml-auto">check_circle</span>
+            <span className="font-annotation text-annotation">Verified</span>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const TaskColumn = ({ title, status, tasks, onMoveTask, dotClass, emptyText }) => {
+  const { setNodeRef } = useDroppable({ id: status });
+
+  return (
+    <div ref={setNodeRef} className="space-y-4">
+      <div className="flex items-center gap-2 pb-2 border-b-2 border-dotted border-on-background/30">
+        <span className={`w-3 h-3 rounded-full ${dotClass}`}></span>
+        <h4 className="font-label-caps text-label-caps">{title}</h4>
+        <span className="font-annotation text-annotation text-on-surface-variant ml-auto">({tasks.length})</span>
+      </div>
+      <SortableContext items={tasks.map(task => task._id)} strategy={verticalListSortingStrategy}>
+        <div className="space-y-4">
+          {tasks.map(task => (
+            <TaskCard key={task._id} task={task} status={status} onMoveTask={onMoveTask} />
+          ))}
+          {tasks.length === 0 && (
+            <div className="text-center py-8 border-2 border-dashed border-on-background/10 rounded font-annotation text-on-surface-variant opacity-60">
+              {emptyText}
+            </div>
+          )}
+        </div>
+      </SortableContext>
+    </div>
+  );
+};
 
 const Dashboard = () => {
   const { searchQuery, refreshTrigger, setRefreshTrigger } = useOutletContext();
@@ -8,6 +139,11 @@ const Dashboard = () => {
   const [tasks, setTasks] = useState([]);
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(true);
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 8 }
+    })
+  );
 
   const fetchData = async () => {
     try {
@@ -39,6 +175,21 @@ const Dashboard = () => {
     } catch (error) {
       console.error('Error updating task status:', error);
     }
+  };
+
+  const handleDragEnd = async (event) => {
+    const { active, over } = event;
+    if (!over) return;
+
+    const taskId = active.id;
+    const newStatus = over.data?.current?.columnId || over.id;
+
+    if (!newStatus || !['TO DO', 'IN PROGRESS', 'DONE'].includes(newStatus)) return;
+
+    const currentTask = tasks.find(task => task._id === taskId);
+    if (currentTask?.status === newStatus) return;
+
+    await handleMoveTask(taskId, newStatus);
   };
 
   // Filter tasks by search query
@@ -202,131 +353,38 @@ const Dashboard = () => {
             <h2 className="font-headline-md text-headline-md">Project Board</h2>
             <div className="flex gap-2 items-center">
               <span className="material-symbols-outlined text-primary">auto_fix_high</span>
-              <span className="font-annotation text-annotation">Click columns to move cards</span>
+              <span className="font-annotation text-annotation">Drag cards between columns or use the arrows</span>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* TO DO Column */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 pb-2 border-b-2 border-dotted border-on-background/30">
-                <span className="w-3 h-3 rounded-full bg-on-background"></span>
-                <h4 className="font-label-caps text-label-caps">TO DO</h4>
-                <span className="font-annotation text-annotation text-on-surface-variant ml-auto">({todoTasks.length})</span>
-              </div>
-              <div className="space-y-4">
-                {todoTasks.map(task => (
-                  <div key={task._id} className="bg-white p-4 rough-border doodle-card border-t-4 border-t-primary-container relative group">
-                    <div className="flex justify-between items-start">
-                      <p className="font-body-md font-bold text-on-surface">{task.title}</p>
-                      <button
-                        onClick={() => handleMoveTask(task._id, 'IN PROGRESS')}
-                        className="p-1 rounded hover:bg-surface-container-high material-symbols-outlined text-sm cursor-pointer ml-1"
-                        title="Move to In Progress"
-                      >
-                        arrow_forward
-                      </button>
-                    </div>
-                    <div className="flex items-center gap-2 mt-4">
-                      <span className="px-2 py-0.5 border border-on-background text-[10px] font-bold rounded-full bg-primary-container">
-                        {task.category}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-                {todoTasks.length === 0 && (
-                  <div className="text-center py-8 border-2 border-dashed border-on-background/10 rounded font-annotation text-on-surface-variant opacity-60">
-                    No items in Todo
-                  </div>
-                )}
-              </div>
+          <DndContext sensors={sensors} collisionDetection={undefined} onDragEnd={handleDragEnd}>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <TaskColumn
+                title="TO DO"
+                status="TO DO"
+                tasks={todoTasks}
+                onMoveTask={handleMoveTask}
+                dotClass="bg-on-background"
+                emptyText="No items in Todo"
+              />
+              <TaskColumn
+                title="IN PROGRESS"
+                status="IN PROGRESS"
+                tasks={inProgressTasks}
+                onMoveTask={handleMoveTask}
+                dotClass="bg-secondary"
+                emptyText="No items In Progress"
+              />
+              <TaskColumn
+                title="DONE"
+                status="DONE"
+                tasks={doneTasks}
+                onMoveTask={handleMoveTask}
+                dotClass="bg-tertiary"
+                emptyText="No completed items"
+              />
             </div>
-
-            {/* IN PROGRESS Column */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 pb-2 border-b-2 border-dotted border-on-background/30">
-                <span className="w-3 h-3 rounded-full bg-secondary"></span>
-                <h4 className="font-label-caps text-label-caps">IN PROGRESS</h4>
-                <span className="font-annotation text-annotation text-on-surface-variant ml-auto">({inProgressTasks.length})</span>
-              </div>
-              <div className="space-y-4">
-                {inProgressTasks.map(task => (
-                  <div key={task._id} className="bg-white p-4 rough-border doodle-card border-t-4 border-t-secondary-container relative group">
-                    <div className="flex justify-between items-start">
-                      <p className="font-body-md font-bold text-on-surface">{task.title}</p>
-                      <div className="flex gap-1 shrink-0">
-                        <button
-                          onClick={() => handleMoveTask(task._id, 'TO DO')}
-                          className="p-1 rounded hover:bg-surface-container-high material-symbols-outlined text-sm cursor-pointer"
-                          title="Move to Todo"
-                        >
-                          arrow_back
-                        </button>
-                        <button
-                          onClick={() => handleMoveTask(task._id, 'DONE')}
-                          className="p-1 rounded hover:bg-surface-container-high material-symbols-outlined text-sm cursor-pointer"
-                          title="Move to Done"
-                        >
-                          check
-                        </button>
-                      </div>
-                    </div>
-                    <div className="mt-4">
-                      <span className="px-2 py-0.5 border border-on-background text-[10px] font-bold rounded-full bg-secondary-container">
-                        {task.category}
-                      </span>
-                      <div className="h-2 w-full bg-surface-container rounded-full overflow-hidden border border-on-background mt-3">
-                        <div className="h-full bg-primary-container w-[45%]"></div>
-                      </div>
-                      <p className="font-annotation text-[10px] mt-1 text-right italic">almost there...</p>
-                    </div>
-                  </div>
-                ))}
-                {inProgressTasks.length === 0 && (
-                  <div className="text-center py-8 border-2 border-dashed border-on-background/10 rounded font-annotation text-on-surface-variant opacity-60">
-                    No items In Progress
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* DONE Column */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 pb-2 border-b-2 border-dotted border-on-background/30">
-                <span className="w-3 h-3 rounded-full bg-tertiary"></span>
-                <h4 className="font-label-caps text-label-caps">DONE</h4>
-                <span className="font-annotation text-annotation text-on-surface-variant ml-auto">({doneTasks.length})</span>
-              </div>
-              <div className="space-y-4">
-                {doneTasks.map(task => (
-                  <div key={task._id} className="bg-white p-4 rough-border doodle-card border-t-4 border-t-tertiary-container opacity-85 relative group">
-                    <div className="flex justify-between items-start">
-                      <p className="font-body-md font-bold text-on-surface line-through text-on-surface-variant">{task.title}</p>
-                      <button
-                        onClick={() => handleMoveTask(task._id, 'IN PROGRESS')}
-                        className="p-1 rounded hover:bg-surface-container-high material-symbols-outlined text-sm cursor-pointer shrink-0 ml-1"
-                        title="Move back to In Progress"
-                      >
-                        undo
-                      </button>
-                    </div>
-                    <div className="flex items-center gap-2 mt-4">
-                      <span className="px-2 py-0.5 border border-on-background text-[10px] font-bold rounded-full bg-tertiary-container text-on-tertiary-container">
-                        {task.category}
-                      </span>
-                      <span className="material-symbols-outlined text-on-tertiary-container ml-auto">check_circle</span>
-                      <span className="font-annotation text-annotation">Verified</span>
-                    </div>
-                  </div>
-                ))}
-                {doneTasks.length === 0 && (
-                  <div className="text-center py-8 border-2 border-dashed border-on-background/10 rounded font-annotation text-on-surface-variant opacity-60">
-                    No completed items
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
+          </DndContext>
         </section>
 
         {/* Sidebar Content (Right Column) */}

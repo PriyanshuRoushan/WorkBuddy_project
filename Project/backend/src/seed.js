@@ -11,6 +11,9 @@ import ChatRoom from './models/ChatRoom.js';
 import Message from './models/Message.js';
 import ProjectNote from './models/ProjectNote.js';
 import ProjectMember from './models/ProjectMember.js';
+import Organization from './models/Organization.js';
+import RoleTemplate from './models/RoleTemplate.js';
+import Rating from './models/Rating.js';
 import connectDB from './config/db.js';
 
 dotenv.config();
@@ -31,8 +34,16 @@ const seedData = async () => {
     await Message.deleteMany();
     await ProjectNote.deleteMany();
     await ProjectMember.deleteMany();
+    await RoleTemplate.deleteMany();
+    await Rating.deleteMany();
+    await Organization.deleteMany();
 
     console.log('Database cleared!');
+
+    const organization = await Organization.create({
+      name: 'WorkBuddy Studio',
+      industry: 'Creative Collaboration'
+    });
 
     // Seed default users for login (with Indian names)
     const seedUsers = [
@@ -81,7 +92,7 @@ const seedData = async () => {
     ];
 
     for (const u of seedUsers) {
-      await User.create(u);
+      await User.create({ ...u, organizationId: organization._id });
     }
     console.log('All company users seeded: pm@workbuddy.com, frontend@workbuddy.com, backend@workbuddy.com, uiux@workbuddy.com, qa@workbuddy.com, creator@workbuddy.com (Password: password123)');
 
@@ -128,7 +139,12 @@ const seedData = async () => {
     ];
 
     const pmForCreator = await User.findOne({ email: 'pm@workbuddy.com' });
-    const projectsWithCreator = projects.map(p => ({ ...p, creator: pmForCreator._id }));
+    const projectsWithCreator = projects.map(p => ({
+      ...p,
+      organizationId: organization._id,
+      creator: pmForCreator._id,
+      creatorId: pmForCreator._id
+    }));
     await Project.insertMany(projectsWithCreator);
     console.log('Projects seeded!');
 
@@ -242,7 +258,14 @@ const seedData = async () => {
       }
     ];
 
-    await Task.insertMany(tasks);
+    const seededUsers = await User.find({ organizationId: organization._id });
+    const usersByEmail = new Map(seededUsers.map(user => [user.email, user]));
+    await Task.insertMany(tasks.map(task => ({
+      ...task,
+      organizationId: organization._id,
+      assignedToEmail: task.assignedTo,
+      assignedTo: usersByEmail.get(task.assignedTo)?._id
+    })));
     console.log('Tasks seeded!');
 
     // Seed Activities (with Indian names)
@@ -271,7 +294,10 @@ const seedData = async () => {
       }
     ];
 
-    await Activity.insertMany(activities);
+    await Activity.insertMany(activities.map(activity => ({
+      ...activity,
+      organizationId: organization._id
+    })));
     console.log('Activities seeded!');
 
     // Seed Calendar Events for October 2024
@@ -327,7 +353,10 @@ const seedData = async () => {
       }
     ];
 
-    await Event.insertMany(events);
+    await Event.insertMany(events.map(event => ({
+      ...event,
+      organizationId: organization._id
+    })));
     console.log('Calendar events seeded!');
 
     // Seed Team Members (with Indian names)
@@ -391,7 +420,10 @@ const seedData = async () => {
       }
     ];
 
-    await StickyNote.insertMany(stickyNotes);
+    await StickyNote.insertMany(stickyNotes.map(note => ({
+      ...note,
+      organizationId: organization._id
+    })));
     console.log('Sticky notes seeded!');
 
     // Seed project collaboration data
@@ -409,16 +441,17 @@ const seedData = async () => {
 
     if (phoenix && urban && lunar && solstice) {
       // 1. Create Chat Rooms
-      const roomPhoenix = await ChatRoom.create({ projectId: phoenix._id, name: 'Phoenix Rebrand Collaboration Chat' });
-      const roomUrban = await ChatRoom.create({ projectId: urban._id, name: 'Urban Oasis App Collaboration Chat' });
-      const roomLunar = await ChatRoom.create({ projectId: lunar._id, name: 'Lunar Coffee Branding Collaboration Chat' });
-      const roomSolstice = await ChatRoom.create({ projectId: solstice._id, name: 'The Solstice Project Collaboration Chat' });
+      const roomPhoenix = await ChatRoom.create({ organizationId: organization._id, projectId: phoenix._id, name: 'Phoenix Rebrand Collaboration Chat' });
+      const roomUrban = await ChatRoom.create({ organizationId: organization._id, projectId: urban._id, name: 'Urban Oasis App Collaboration Chat' });
+      const roomLunar = await ChatRoom.create({ organizationId: organization._id, projectId: lunar._id, name: 'Lunar Coffee Branding Collaboration Chat' });
+      const roomSolstice = await ChatRoom.create({ organizationId: organization._id, projectId: solstice._id, name: 'The Solstice Project Collaboration Chat' });
       console.log('Collaboration Chat Rooms seeded!');
 
       // 2. Create Project Members
       const allProjects = [phoenix, urban, lunar, solstice];
       for (const p of allProjects) {
         await ProjectMember.create({
+          organizationId: organization._id,
           projectId: p._id,
           userId: pm._id,
           email: pm.email,
@@ -427,31 +460,35 @@ const seedData = async () => {
       }
 
       // Phoenix Members
-      await ProjectMember.create({ projectId: phoenix._id, userId: frontend._id, email: frontend.email, role: frontend.role });
-      await ProjectMember.create({ projectId: phoenix._id, userId: uiux._id, email: uiux.email, role: uiux.role });
+      await ProjectMember.create({ organizationId: organization._id, projectId: phoenix._id, userId: frontend._id, email: frontend.email, role: frontend.role });
+      await ProjectMember.create({ organizationId: organization._id, projectId: phoenix._id, userId: uiux._id, email: uiux.email, role: uiux.role });
 
       // Urban Members
-      await ProjectMember.create({ projectId: urban._id, userId: frontend._id, email: frontend.email, role: frontend.role });
-      await ProjectMember.create({ projectId: urban._id, userId: uiux._id, email: uiux.email, role: uiux.role });
-      await ProjectMember.create({ projectId: urban._id, userId: backend._id, email: backend.email, role: backend.role });
+      await ProjectMember.create({ organizationId: organization._id, projectId: urban._id, userId: frontend._id, email: frontend.email, role: frontend.role });
+      await ProjectMember.create({ organizationId: organization._id, projectId: urban._id, userId: uiux._id, email: uiux.email, role: uiux.role });
+      await ProjectMember.create({ organizationId: organization._id, projectId: urban._id, userId: backend._id, email: backend.email, role: backend.role });
 
       // Lunar Members
-      await ProjectMember.create({ projectId: lunar._id, userId: backend._id, email: backend.email, role: backend.role });
-      await ProjectMember.create({ projectId: lunar._id, userId: qa._id, email: qa.email, role: qa.role });
+      await ProjectMember.create({ organizationId: organization._id, projectId: lunar._id, userId: backend._id, email: backend.email, role: backend.role });
+      await ProjectMember.create({ organizationId: organization._id, projectId: lunar._id, userId: qa._id, email: qa.email, role: qa.role });
       console.log('Project Members seeded!');
 
       // 3. Create Messages
       const m1 = await Message.create({
+        organizationId: organization._id,
         roomId: roomPhoenix._id,
         sender: pm._id,
+        senderId: pm._id,
         senderName: pm.name,
         senderRole: pm.role,
         content: "Welcome to the Phoenix Rebrand collaboration workspace! Let's get the design system updated.",
         readBy: [pm._id, frontend._id, uiux._id]
       });
       const m2 = await Message.create({
+        organizationId: organization._id,
         roomId: roomPhoenix._id,
         sender: uiux._id,
+        senderId: uiux._id,
         senderName: uiux.name,
         senderRole: uiux.role,
         content: "Already on it! I've uploaded the new typography guidelines on the whiteboard.",
@@ -459,8 +496,10 @@ const seedData = async () => {
         readBy: [pm._id, frontend._id, uiux._id]
       });
       await Message.create({
+        organizationId: organization._id,
         roomId: roomPhoenix._id,
         sender: frontend._id,
+        senderId: frontend._id,
         senderName: frontend.name,
         senderRole: frontend.role,
         content: "Looks clean! I will start implementing the typography variables today.",
@@ -468,8 +507,10 @@ const seedData = async () => {
       });
 
       await Message.create({
+        organizationId: organization._id,
         roomId: roomUrban._id,
         sender: pm._id,
+        senderId: pm._id,
         senderName: pm.name,
         senderRole: pm.role,
         content: "Let's align on the high-fidelity wireframes here.",
@@ -479,9 +520,11 @@ const seedData = async () => {
 
       // 4. Create Project Notes (Whiteboard notes)
       await ProjectNote.create({
+        organizationId: organization._id,
         noteId: 'note-phoenix-1',
         projectId: phoenix._id,
         createdBy: uiux.name,
+        createdByUserId: uiux._id,
         content: "Typography Guidelines:\n- Primary: Outfit (700 for headings)\n- Body: Inter (400)\n- Keep spacing tight & clean",
         positionX: 120,
         positionY: 80,
@@ -491,9 +534,11 @@ const seedData = async () => {
         isPinned: true
       });
       await ProjectNote.create({
+        organizationId: organization._id,
         noteId: 'note-phoenix-2',
         projectId: phoenix._id,
         createdBy: pm.name,
+        createdByUserId: pm._id,
         content: "Sprint 1 Goals:\n- Modernize logo vector\n- Finalize color tokens\n- Draft Figma component set",
         positionX: 400,
         positionY: 100,
@@ -504,9 +549,11 @@ const seedData = async () => {
       });
 
       await ProjectNote.create({
+        organizationId: organization._id,
         noteId: 'note-urban-1',
         projectId: urban._id,
         createdBy: uiux.name,
+        createdByUserId: uiux._id,
         content: "Figma wireframe link: https://figma.com/file/urban-oasis-mockups",
         positionX: 100,
         positionY: 100,

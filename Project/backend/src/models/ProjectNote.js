@@ -1,6 +1,11 @@
 import mongoose from 'mongoose';
 
 const projectNoteSchema = new mongoose.Schema({
+  organizationId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Organization',
+    index: true
+  },
   noteId: {
     type: String,
     required: true,
@@ -14,6 +19,10 @@ const projectNoteSchema = new mongoose.Schema({
   createdBy: {
     type: String,
     required: true
+  },
+  createdByUserId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
   },
   content: {
     type: String,

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { io } from 'socket.io-client';
+import { CONSTANT } from '../../constant';
 import { 
   getProject, 
   getProjectMessages, 
@@ -123,14 +124,14 @@ const ProjectWorkspace = () => {
         }
 
         // 5. Establish Socket.IO Connection
-        socketRef.current = io('http://localhost:3001');
+        socketRef.current = io(CONSTANT.API_URL.replace(/\/$/, ''), {
+          auth: { token }
+        });
 
         // On socket connect, join project room
         socketRef.current.emit('join-project-room', {
           projectId,
-          userId: currentUser._id, // using database user _id
-          userName: currentUser.name,
-          userEmail: currentUser.email
+          userId: currentUser._id
         });
 
         // Socket Event Listeners
@@ -267,7 +268,7 @@ const ProjectWorkspace = () => {
       if (socketRef.current) {
         socketRef.current.emit('leave-project-room', {
           projectId,
-          userId: currentUser?.name
+          userId: currentUser?._id
         });
         socketRef.current.disconnect();
       }
@@ -437,18 +438,20 @@ const ProjectWorkspace = () => {
   // Get all teammates assigned to this project (plus PM creator)
   const getProjectTeammates = () => {
     if (!project || !allTeammates) return [];
-    const collaboratorsImages = project.collaborators || [];
+    const collaboratorIds = new Set(
+      (project.collaboratorUsers || []).map(member => String(member._id))
+    );
     return allTeammates.filter(member => {
-      if (collaboratorsImages.includes(member.profileImage)) return true;
-      if (member.role === 'Project Manager') return true;
-      return false;
+      return collaboratorIds.has(String(member._id));
     });
   };
 
   // Find teammate details by email
-  const getAssigneeDetails = (email) => {
+  const getAssigneeDetails = (assigneeValue) => {
     if (!allTeammates) return null;
-    return allTeammates.find(m => m.email === email);
+    return allTeammates.find(member => {
+      return member.email === assigneeValue || String(member._id) === String(assigneeValue);
+    });
   };
 
   // Create Task
@@ -465,7 +468,7 @@ const ProjectWorkspace = () => {
         category: newTaskCategory,
         status: 'TO DO',
         dueDate: newTaskDueDate || undefined,
-        assignedTo: newTaskAssignedTo || currentUser.email,
+        assignedTo: newTaskAssignedTo || currentUser._id,
         projectId
       };
 
@@ -655,7 +658,7 @@ const ProjectWorkspace = () => {
 
   // Resolve message background styles in neubrutalist theme
   const getMessageBubbleStyle = (sender) => {
-    if (sender === currentUser.name) {
+    if (String(sender) === String(currentUser._id)) {
       return 'bg-primary-container text-on-primary-container border-2 border-on-background shadow-[2px_2px_0px_0px_rgba(28,27,27,1)] ml-auto';
     }
     return 'bg-white text-on-surface border-2 border-on-background shadow-[2px_2px_0px_0px_rgba(28,27,27,1)]';
@@ -927,7 +930,7 @@ const ProjectWorkspace = () => {
                       >
                         <option value="">Self (or select teammate)</option>
                         {getProjectTeammates().map(m => (
-                          <option key={m._id} value={m.email}>{m.name} ({m.role})</option>
+                          <option key={m._id} value={m._id}>{m.name} ({m.role})</option>
                         ))}
                       </select>
                     </div>
@@ -1133,7 +1136,7 @@ const ProjectWorkspace = () => {
         {/* Message History List */}
         <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-[#fcfcfa]">
           {filteredMessages.map((msg) => {
-            const isMe = msg.sender === currentUser.name;
+            const isMe = String(msg.senderId || msg.sender) === String(currentUser._id);
             const bubbleBg = getMessageBubbleStyle(msg.sender);
             
             // Format time
@@ -1168,13 +1171,13 @@ const ProjectWorkspace = () => {
                       {msg.fileType?.startsWith('image/') ? (
                         <div className="flex flex-col gap-1.5">
                           <img 
-                            src={`http://localhost:3001${msg.fileUrl}`} 
+                            src={msg.fileUrl}
                             alt={msg.fileName}
                             className="max-h-32 max-w-full rounded border border-on-background object-cover cursor-zoom-in"
-                            onClick={() => window.open(`http://localhost:3001${msg.fileUrl}`, '_blank')}
+                            onClick={() => window.open(msg.fileUrl, '_blank')}
                           />
                           <a 
-                            href={`http://localhost:3001${msg.fileUrl}`} 
+                            href={msg.fileUrl}
                             download 
                             target="_blank" 
                             className="text-[10px] text-primary underline flex items-center gap-1 font-bold"
@@ -1189,7 +1192,7 @@ const ProjectWorkspace = () => {
                           <div className="flex flex-col">
                             <span className="text-[10px] font-bold truncate max-w-[150px]">{msg.fileName}</span>
                             <a 
-                              href={`http://localhost:3001${msg.fileUrl}`} 
+                              href={msg.fileUrl}
                               download 
                               target="_blank" 
                               className="text-[9px] text-primary underline font-bold"
@@ -1207,7 +1210,9 @@ const ProjectWorkspace = () => {
                     {/* Toggled reaction list */}
                     {['👍', '❤️', '🔥', '😂', '😮'].map((emoji) => {
                       const count = (msg.reactions || []).filter(r => r.emoji === emoji).length;
-                      const hasReacted = (msg.reactions || []).some(r => r.emoji === emoji && r.user === currentUser.name);
+                      const hasReacted = (msg.reactions || []).some(r => {
+                        return r.emoji === emoji && String(r.userId || '') === String(currentUser._id);
+                      });
 
                       return (
                         <button

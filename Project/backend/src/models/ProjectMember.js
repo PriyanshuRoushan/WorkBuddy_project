@@ -1,6 +1,11 @@
 import mongoose from 'mongoose';
 
 const projectMemberSchema = new mongoose.Schema({
+  organizationId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Organization',
+    index: true
+  },
   projectId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Project',
@@ -23,6 +28,7 @@ const projectMemberSchema = new mongoose.Schema({
 
 // Ensure unique project membership
 projectMemberSchema.index({ projectId: 1, userId: 1 }, { unique: true });
+projectMemberSchema.index({ organizationId: 1, projectId: 1, userId: 1 }, { unique: true });
 
 const ProjectMember = mongoose.model('ProjectMember', projectMemberSchema);
 export default ProjectMember;

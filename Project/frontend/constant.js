@@ -1,5 +1,4 @@
 export const CONSTANT = {
-    API_URL: import.meta.env.VITE_BACKEND_URL, 
-    ENV: import.meta.env.NODE_ENV
-
-}
+  API_URL: import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001',
+  ENV: import.meta.env.MODE
+};

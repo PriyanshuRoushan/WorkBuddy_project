@@ -1,21 +1,66 @@
 import Project from '../models/Project.js';
 import Activity from '../models/Activity.js';
-import TeamMember from '../models/TeamMember.js';
 import User from '../models/User.js';
 import ChatRoom from '../models/ChatRoom.js';
 import ProjectMember from '../models/ProjectMember.js';
+import { tenantFilter } from '../utils/tenant.js';
+
+const resolveUsers = async (organizationId, collaboratorValues = []) => {
+  if (!collaboratorValues.length) return [];
+
+  return User.find({
+    organizationId,
+    $or: [
+      { _id: { $in: collaboratorValues.filter(value => /^[a-f\d]{24}$/i.test(String(value))) } },
+      { profileImage: { $in: collaboratorValues } },
+      { email: { $in: collaboratorValues.map(value => String(value).toLowerCase()) } }
+    ]
+  }).select('_id name email role profileImage');
+};
+
+const decorateProject = async (project) => {
+  if (!project) return null;
+  const plainProject = project.toObject ? project.toObject() : project;
+  const memberships = await ProjectMember.find({
+    organizationId: plainProject.organizationId,
+    projectId: plainProject._id
+  }).populate('userId', 'name email role profileImage');
+
+  const collaboratorUsers = memberships
+    .map(membership => membership.userId)
+    .filter(Boolean);
+
+  return {
+    ...plainProject,
+    creator: plainProject.creatorId || plainProject.creator,
+    collaboratorUsers,
+    // Temporary compatibility field for the existing avatar-based frontend.
+    collaborators: collaboratorUsers.map(user => user.profileImage).filter(Boolean)
+  };
+};
+
+const assertProjectAccess = async (req, projectId) => {
+  if (req.user.role === 'Project Manager' || req.user.role === 'Admin') return true;
+  return Boolean(await ProjectMember.exists({
+    organizationId: req.user.organizationId,
+    projectId,
+    userId: req.user._id
+  }));
+};
 
 export const getProjects = async (req, res) => {
   try {
-    let projects;
-    if (req.user && (req.user.role === 'Project Manager' || req.user.role === 'Admin')) {
-      projects = await Project.find().sort({ updatedAt: -1 });
-    } else {
-      const memberships = await ProjectMember.find({ userId: req.user._id });
-      const projectIds = memberships.map(m => m.projectId);
-      projects = await Project.find({ _id: { $in: projectIds } }).sort({ updatedAt: -1 });
+    let query = tenantFilter(req);
+    if (req.user.role !== 'Project Manager' && req.user.role !== 'Admin') {
+      const memberships = await ProjectMember.find({
+        organizationId: req.user.organizationId,
+        userId: req.user._id
+      });
+      query = tenantFilter(req, { _id: { $in: memberships.map(membership => membership.projectId) } });
     }
-    res.json(projects);
+
+    const projects = await Project.find(query).sort({ updatedAt: -1 });
+    res.json(await Promise.all(projects.map(decorateProject)));
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -23,62 +68,61 @@ export const getProjects = async (req, res) => {
 
 export const getProjectById = async (req, res) => {
   try {
-    const project = await Project.findById(req.params.id);
+    const project = await Project.findOne(tenantFilter(req, { _id: req.params.id }));
     if (!project) return res.status(404).json({ message: 'Project not found' });
-    res.json(project);
+    if (!(await assertProjectAccess(req, project._id))) {
+      return res.status(403).json({ message: 'Access denied: You are not a project member' });
+    }
+    res.json(await decorateProject(project));
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
 
 export const createProject = async (req, res) => {
-  const { title, description, progress, status, collaborators } = req.body;
+  const { title, description, progress, status, collaborators = [] } = req.body;
   try {
-    const project = new Project({ title, description, progress, status, collaborators, creator: req.user._id });
-    const savedProject = await project.save();
-    
-    // Auto-create Chat Room
+    const project = await Project.create({
+      organizationId: req.user.organizationId,
+      title,
+      description,
+      progress,
+      status,
+      creator: req.user._id,
+      creatorId: req.user._id
+    });
+
     await ChatRoom.create({
-      projectId: savedProject._id,
-      name: `${title} Collaboration Chat`
+      organizationId: req.user.organizationId,
+      projectId: project._id,
+      name: `${title} Collaboration Chat`,
+      participants: [req.user._id]
     });
 
-    // Populate ProjectMember collection
-    // 1. Add PM
-    await ProjectMember.create({
-      projectId: savedProject._id,
-      userId: req.user._id,
-      email: req.user.email,
-      role: req.user.role
-    });
+    const collaboratorUsers = await resolveUsers(req.user.organizationId, collaborators);
+    const members = [
+      { userId: req.user._id, email: req.user.email, role: 'Admin' },
+      ...collaboratorUsers
+        .filter(user => user._id.toString() !== req.user._id.toString())
+        .map(user => ({ userId: user._id, email: user.email, role: 'Editor' }))
+    ];
 
-    // 2. Add collaborators
-    if (collaborators && collaborators.length > 0) {
-      for (const colImg of collaborators) {
-        const teamMember = await TeamMember.findOne({ profileImage: colImg });
-        if (teamMember) {
-          const user = await User.findOne({ email: teamMember.email });
-          if (user) {
-            await ProjectMember.create({
-              projectId: savedProject._id,
-              userId: user._id,
-              email: user.email,
-              role: user.role
-            }).catch(err => console.log('Duplicate ProjectMember check skipped:', err.message));
-          }
-        }
-      }
-    }
+    await ProjectMember.insertMany(members.map(member => ({
+      organizationId: req.user.organizationId,
+      projectId: project._id,
+      ...member
+    })));
 
-    // Log activity
     await Activity.create({
+      organizationId: req.user.organizationId,
+      actorId: req.user._id,
       user: req.user.name.split(' ')[0],
       action: 'started a new project',
       target: title,
       type: 'add'
     });
 
-    res.status(201).json(savedProject);
+    res.status(201).json(await decorateProject(project));
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
@@ -86,71 +130,51 @@ export const createProject = async (req, res) => {
 
 export const updateProject = async (req, res) => {
   try {
-    const originalProject = await Project.findById(req.params.id);
-    if (!originalProject) return res.status(404).json({ message: 'Project not found' });
+    const project = await Project.findOne(tenantFilter(req, { _id: req.params.id }));
+    if (!project) return res.status(404).json({ message: 'Project not found' });
 
-    const updatedProject = await Project.findByIdAndUpdate(
-      req.params.id,
-      req.body,
-      { new: true, runValidators: true }
-    );
+    const oldStatus = project.status;
+    const oldProgress = project.progress;
+    const { collaborators, organizationId, creator, creatorId, ...updates } = req.body;
+    Object.assign(project, updates);
+    const updatedProject = await project.save();
 
-    // Sync collaborators to ProjectMember if collaborators is updated
-    if (req.body.collaborators) {
-      // Keep project creator as member
-      let creatorUser = originalProject.creator ? await User.findById(originalProject.creator) : null;
-      const creatorMember = await ProjectMember.findOne({ projectId: req.params.id, role: 'Project Manager' });
-      await ProjectMember.deleteMany({ projectId: req.params.id });
+    if (Array.isArray(collaborators)) {
+      const collaboratorUsers = await resolveUsers(req.user.organizationId, collaborators);
+      await ProjectMember.deleteMany({
+        organizationId: req.user.organizationId,
+        projectId: project._id,
+        userId: { $ne: project.creatorId || project.creator }
+      });
 
-      if (creatorUser) {
-        await ProjectMember.create({
-          projectId: req.params.id,
-          userId: creatorUser._id,
-          email: creatorUser.email,
-          role: creatorUser.role
-        });
-      } else if (creatorMember) {
-        await ProjectMember.create({
-          projectId: req.params.id,
-          userId: creatorMember.userId,
-          email: creatorMember.email,
-          role: creatorMember.role
-        });
-      } else {
-        await ProjectMember.create({
-          projectId: req.params.id,
-          userId: req.user._id,
-          email: req.user.email,
-          role: req.user.role
-        });
-      }
-
-      for (const colImg of req.body.collaborators) {
-        const teamMember = await TeamMember.findOne({ profileImage: colImg });
-        if (teamMember) {
-          const user = await User.findOne({ email: teamMember.email });
-          if (user) {
-            await ProjectMember.create({
-              projectId: req.params.id,
-              userId: user._id,
-              email: user.email,
-              role: user.role
-            }).catch(err => console.log('Duplicate ProjectMember check skipped:', err.message));
-          }
-        }
+      for (const user of collaboratorUsers) {
+        if (user._id.toString() === String(project.creatorId || project.creator)) continue;
+        await ProjectMember.updateOne(
+          {
+            organizationId: req.user.organizationId,
+            projectId: project._id,
+            userId: user._id
+          },
+          {
+            $set: { email: user.email, role: 'Editor' },
+            $setOnInsert: { organizationId: req.user.organizationId, projectId: project._id, userId: user._id }
+          },
+          { upsert: true }
+        );
       }
     }
 
-    // Log activity if progress or status changed significantly
     let action = '';
-    if (originalProject.status !== updatedProject.status) {
+    if (oldStatus !== updatedProject.status) {
       action = `moved status to ${updatedProject.status} for`;
-    } else if (originalProject.progress !== updatedProject.progress) {
+    } else if (oldProgress !== updatedProject.progress) {
       action = `updated progress to ${updatedProject.progress}% for`;
     }
 
     if (action) {
       await Activity.create({
+        organizationId: req.user.organizationId,
+        actorId: req.user._id,
         user: req.user.name.split(' ')[0],
         action,
         target: updatedProject.title,
@@ -158,7 +182,7 @@ export const updateProject = async (req, res) => {
       });
     }
 
-    res.json(updatedProject);
+    res.json(await decorateProject(updatedProject));
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
@@ -166,22 +190,21 @@ export const updateProject = async (req, res) => {
 
 export const deleteProject = async (req, res) => {
   try {
-    const project = await Project.findById(req.params.id);
+    const project = await Project.findOne(tenantFilter(req, { _id: req.params.id }));
     if (!project) return res.status(404).json({ message: 'Project not found' });
 
-    // Assert that the user is the project creator
-    if (project.creator && project.creator.toString() !== req.user._id.toString()) {
+    const creatorId = project.creatorId || project.creator;
+    if (creatorId && creatorId.toString() !== req.user._id.toString() && req.user.role !== 'Admin') {
       return res.status(403).json({ message: 'Access denied: Only the project creator can delete this workspace.' });
     }
 
-    await Project.findByIdAndDelete(req.params.id);
+    await Project.deleteOne({ _id: project._id });
+    await ChatRoom.findOneAndDelete(tenantFilter(req, { projectId: project._id }));
+    await ProjectMember.deleteMany(tenantFilter(req, { projectId: project._id }));
 
-    // Clean up ChatRoom & ProjectMembers
-    await ChatRoom.findOneAndDelete({ projectId: req.params.id });
-    await ProjectMember.deleteMany({ projectId: req.params.id });
-
-    // Log activity
     await Activity.create({
+      organizationId: req.user.organizationId,
+      actorId: req.user._id,
       user: req.user.name.split(' ')[0],
       action: 'deleted the project',
       target: project.title,

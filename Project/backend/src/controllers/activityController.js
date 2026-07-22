@@ -1,16 +1,17 @@
 import Activity from '../models/Activity.js';
+import { tenantFilter } from '../utils/tenant.js';
 
 export const getActivities = async (req, res) => {
   try {
-    let query = {};
+    let query = tenantFilter(req);
     if (req.user && req.user.role !== 'Project Manager' && req.user.role !== 'Admin') {
       const firstName = req.user.name.split(' ')[0];
-      query = {
+      query = tenantFilter(req, {
         $or: [
           { user: firstName },
           { user: 'System' }
         ]
-      };
+      });
     }
     const activities = await Activity.find(query).sort({ createdAt: -1 }).limit(15);
     res.json(activities);
@@ -22,7 +23,15 @@ export const getActivities = async (req, res) => {
 export const createActivity = async (req, res) => {
   const { user, action, target, details, type } = req.body;
   try {
-    const activity = new Activity({ user, action, target, details, type });
+    const activity = new Activity({
+      organizationId: req.user.organizationId,
+      actorId: req.user._id,
+      user,
+      action,
+      target,
+      details,
+      type
+    });
     const savedActivity = await activity.save();
     res.status(201).json(savedActivity);
   } catch (error) {

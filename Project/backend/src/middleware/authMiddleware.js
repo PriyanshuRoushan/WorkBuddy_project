@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
+import { getOrCreateDefaultOrganization } from '../utils/tenant.js';
 
 export const protect = async (req, res, next) => {
   let token;
@@ -12,6 +13,11 @@ export const protect = async (req, res, next) => {
       if (!req.user) {
         return res.status(401).json({ message: 'Not authorized, user not found' });
       }
+      if (!req.user.organizationId) {
+        const organization = await getOrCreateDefaultOrganization();
+        req.user.organizationId = organization._id;
+        await req.user.save();
+      }
       next();
     } catch (error) {
       console.error('Token validation error:', error);
@@ -22,7 +28,7 @@ export const protect = async (req, res, next) => {
   }
 };
 export const requireProjectManager = (req, res, next) => {
-  if (req.user && req.user.role === 'Project Manager') {
+  if (req.user && (req.user.role === 'Project Manager' || req.user.role === 'Admin')) {
     next();
   } else {
     res.status(403).json({ message: 'Access denied: Only a Project Manager can perform this action' });

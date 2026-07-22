@@ -95,6 +95,7 @@ const Settings = () => {
           return setError('Please enter your current password to update it.');
         }
         payload.password = newPassword;
+        payload.currentPassword = currentPassword;
       }
 
       const updatedUser = await updateProfile(payload);

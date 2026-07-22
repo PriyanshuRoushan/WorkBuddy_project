@@ -39,11 +39,11 @@ const Layout = () => {
     }
   };
 
-  const handleToggleCollaborator = (profileImage) => {
+  const handleToggleCollaborator = (userId) => {
     setSelectedCollaborators(prev => 
-      prev.includes(profileImage)
-        ? prev.filter(img => img !== profileImage)
-        : [...prev, profileImage]
+      prev.includes(userId)
+        ? prev.filter(id => id !== userId)
+        : [...prev, userId]
     );
   };
 
@@ -166,8 +166,8 @@ const Layout = () => {
                         <label key={member._id} className="flex items-center gap-2 text-xs font-bold cursor-pointer select-none">
                           <input
                             type="checkbox"
-                            checked={selectedCollaborators.includes(member.profileImage)}
-                            onChange={() => handleToggleCollaborator(member.profileImage)}
+                            checked={selectedCollaborators.includes(member._id)}
+                            onChange={() => handleToggleCollaborator(member._id)}
                             className="rounded border-2 border-on-background text-primary focus:ring-primary focus:ring-offset-0 bg-transparent checked:bg-primary cursor-pointer w-4 h-4"
                           />
                           <img src={member.profileImage} alt={member.name} className="w-6 h-6 rounded-full border border-on-background object-cover" />

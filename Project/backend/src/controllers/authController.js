@@ -1,8 +1,8 @@
 import User from '../models/User.js';
-import TeamMember from '../models/TeamMember.js';
 import Project from '../models/Project.js';
 import ProjectMember from '../models/ProjectMember.js';
 import jwt from 'jsonwebtoken';
+import { getOrCreateDefaultOrganization } from '../utils/tenant.js';
 
 // Helper to generate JWT Token
 const generateToken = (id) => {
@@ -14,30 +14,30 @@ const generateToken = (id) => {
 export const registerUser = async (req, res) => {
   const { name, email, password, role } = req.body;
   try {
-    const userExists = await User.findOne({ email });
+    const organization = await getOrCreateDefaultOrganization();
+    const normalizedEmail = email.toLowerCase();
+    const userExists = await User.findOne({ organizationId: organization._id, email: normalizedEmail });
     if (userExists) {
       return res.status(400).json({ message: 'User already exists' });
     }
 
-    // Resolve profileImage if they were invited in TeamMember
-    const teamMember = await TeamMember.findOne({ email });
-    let profileImage;
-    if (teamMember) {
-      profileImage = teamMember.profileImage;
-    }
+    const user = await User.create({
+      organizationId: organization._id,
+      name,
+      email: normalizedEmail,
+      password,
+      role
+    });
 
-    const userFields = { name, email, password, role };
-    if (profileImage) {
-      userFields.profileImage = profileImage;
-    }
-
-    const user = await User.create(userFields);
-
-    // Auto-create ProjectMember records for any projects they are already collaborators on
-    if (profileImage) {
-      const matchingProjects = await Project.find({ collaborators: profileImage });
+    // Backfill project membership for legacy projects that still reference collaborator avatars.
+    if (user.profileImage) {
+      const matchingProjects = await Project.find({
+        organizationId: organization._id,
+        collaborators: user.profileImage
+      });
       for (const project of matchingProjects) {
         await ProjectMember.create({
+          organizationId: organization._id,
           projectId: project._id,
           userId: user._id,
           email: user.email,
@@ -52,6 +52,7 @@ export const registerUser = async (req, res) => {
       email: user.email,
       role: user.role,
       profileImage: user.profileImage,
+      organizationId: user.organizationId,
       token: generateToken(user._id)
     });
   } catch (error) {
@@ -62,7 +63,7 @@ export const registerUser = async (req, res) => {
 export const loginUser = async (req, res) => {
   const { email, password } = req.body;
   try {
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email: email.toLowerCase() });
     if (user && (await user.matchPassword(password))) {
       res.json({
         _id: user._id,
@@ -70,6 +71,7 @@ export const loginUser = async (req, res) => {
         email: user.email,
         role: user.role,
         profileImage: user.profileImage,
+        organizationId: user.organizationId,
         token: generateToken(user._id)
       });
     } else {
@@ -102,7 +104,7 @@ export const updateProfile = async (req, res) => {
     const oldImage = user.profileImage;
 
     user.name = req.body.name || user.name;
-    user.email = req.body.email || user.email;
+    user.email = req.body.email ? req.body.email.toLowerCase() : user.email;
     user.bio = req.body.bio !== undefined ? req.body.bio : user.bio;
     user.profileImage = req.body.profileImage || user.profileImage;
     user.sketchStyle = req.body.sketchStyle || user.sketchStyle;
@@ -111,26 +113,24 @@ export const updateProfile = async (req, res) => {
     user.notifyScribbles = req.body.notifyScribbles !== undefined ? req.body.notifyScribbles : user.notifyScribbles;
 
     if (req.body.password) {
+      if (!req.body.currentPassword || !(await user.matchPassword(req.body.currentPassword))) {
+        return res.status(400).json({ message: 'Current password is incorrect' });
+      }
       user.password = req.body.password;
     }
 
     const updatedUser = await user.save();
 
-    // 1. Sync update to TeamMember collection
-    const tmUpdate = { name: updatedUser.name, email: updatedUser.email, profileImage: updatedUser.profileImage };
-    await TeamMember.findOneAndUpdate({ email: oldEmail }, tmUpdate);
-
-    // 2. Sync profile image inside Project.collaborators array for all projects
+    // Keep legacy avatar arrays in sync while the frontend migrates to ProjectMember.
     if (oldImage !== updatedUser.profileImage) {
       await Project.updateMany(
-        { collaborators: oldImage },
+        { organizationId: updatedUser.organizationId, collaborators: oldImage },
         { $set: { "collaborators.$": updatedUser.profileImage } }
       );
     }
 
-    // 3. Sync changes inside ProjectMember objects
     await ProjectMember.updateMany(
-      { userId: updatedUser._id },
+      { organizationId: updatedUser.organizationId, userId: updatedUser._id },
       { email: updatedUser.email, role: updatedUser.role }
     );
     
@@ -140,6 +140,7 @@ export const updateProfile = async (req, res) => {
       email: updatedUser.email,
       role: updatedUser.role,
       profileImage: updatedUser.profileImage,
+      organizationId: updatedUser.organizationId,
       bio: updatedUser.bio,
       sketchStyle: updatedUser.sketchStyle,
       gridDensity: updatedUser.gridDensity,

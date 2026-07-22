@@ -15,7 +15,7 @@ router.route('/')
   .post(protect, requireProjectManager, createProject);
 
 router.route('/:id')
-  .get(getProjectById)
+  .get(protect, getProjectById)
   .put(protect, requireProjectManager, updateProject)
   .delete(protect, requireProjectManager, deleteProject);
 

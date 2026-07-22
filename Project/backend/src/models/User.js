@@ -2,6 +2,15 @@ import mongoose from 'mongoose';
 import bcrypt from 'bcrypt';
 
 const userSchema = new mongoose.Schema({
+  organizationId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Organization',
+    index: true
+  },
+  roleTemplateId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'RoleTemplate'
+  },
   name: {
     type: String,
     required: true,
@@ -10,7 +19,6 @@ const userSchema = new mongoose.Schema({
   email: {
     type: String,
     required: true,
-    unique: true,
     trim: true,
     lowercase: true
   },
@@ -46,10 +54,62 @@ const userSchema = new mongoose.Schema({
   notifyScribbles: {
     type: Boolean,
     default: false
+  },
+  dynamicProfile: {
+    type: Map,
+    of: mongoose.Schema.Types.Mixed,
+    default: {}
+  },
+  aggregatedMetrics: {
+    normalizedSkillScore: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 1
+    },
+    normalizedRating: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 1
+    },
+    synergyScore: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 1
+    },
+    currentWorkload: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 100
+    }
+  },
+  topCollaborators: [{
+    peerId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    synergyScore: {
+      type: Number,
+      default: 0
+    },
+    projectsWorkedTogether: {
+      type: Number,
+      default: 0
+    }
+  }],
+  themePreference: {
+    type: String,
+    enum: ['light', 'dark'],
+    default: 'light'
   }
 }, {
   timestamps: true
 });
+
+userSchema.index({ organizationId: 1, email: 1 }, { unique: true });
 
 // Hash password before saving
 userSchema.pre('save', async function (next) {

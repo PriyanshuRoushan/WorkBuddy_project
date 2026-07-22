@@ -1,6 +1,11 @@
 import mongoose from 'mongoose';
 
 const stickyNoteSchema = new mongoose.Schema({
+  organizationId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Organization',
+    index: true
+  },
   content: {
     type: String,
     required: true,
@@ -10,6 +15,10 @@ const stickyNoteSchema = new mongoose.Schema({
     type: String,
     required: true,
     trim: true
+  },
+  authorId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
   },
   color: {
     type: String,

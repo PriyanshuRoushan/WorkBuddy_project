@@ -12,15 +12,15 @@ const router = express.Router();
 
 // Members routes
 router.route('/members')
-  .get(getTeamMembers)
+  .get(protect, getTeamMembers)
   .post(protect, requireProjectManager, inviteTeamMember);
 
 // Sticky notes routes
 router.route('/notes')
-  .get(getStickyNotes)
-  .post(createStickyNote);
+  .get(protect, getStickyNotes)
+  .post(protect, createStickyNote);
 
 router.route('/notes/:id')
-  .delete(deleteStickyNote);
+  .delete(protect, deleteStickyNote);
 
 export default router;

@@ -6,6 +6,7 @@
     "backend": "cd backend && npm run dev",
     "frontend": "cd frontend && npm run dev",
     "seed": "cd backend && npm run seed",
+    "migrate:v2": "cd backend && npm run migrate:v2",
     "test-db": "cd backend && node test-connection.js",
     "start": "npx concurrently \"npm run backend\" \"npm run frontend\""
   }
