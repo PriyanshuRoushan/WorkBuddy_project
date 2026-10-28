@@ -27,7 +27,7 @@ const Layout = () => {
   const handleOpenModal = async () => {
     const userString = localStorage.getItem('user');
     const user = userString ? JSON.parse(userString) : null;
-    const isPM = user && user.role === 'Project Manager';
+    const isPM = user && ['CEO', 'HR', 'MANAGER', 'TEAM_HEAD'].includes(user.accessRole || user.role);
     setModalType(isPM ? 'project' : 'task');
     setIsModalOpen(true);
 
@@ -117,7 +117,7 @@ const Layout = () => {
               {(() => {
                 const userString = localStorage.getItem('user');
                 const user = userString ? JSON.parse(userString) : null;
-                const isPM = user && user.role === 'Project Manager';
+                const isPM = user && ['CEO', 'HR', 'MANAGER', 'TEAM_HEAD'].includes(user.accessRole || user.role);
                 return isPM && (
                   <button
                     type="button"
@@ -171,7 +171,7 @@ const Layout = () => {
                             className="rounded border-2 border-on-background text-primary focus:ring-primary focus:ring-offset-0 bg-transparent checked:bg-primary cursor-pointer w-4 h-4"
                           />
                           <img src={member.profileImage} alt={member.name} className="w-6 h-6 rounded-full border border-on-background object-cover" />
-                          <span>{member.name} ({member.role})</span>
+                          <span>{member.name} ({member.jobTitle || member.accessRole})</span>
                         </label>
                       ))}
                       {teamMembers.length === 0 && (

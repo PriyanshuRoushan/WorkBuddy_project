@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { tenantModelProxy } from '../tenancy/tenantContext.js';
 
 const roleTemplateSchema = new mongoose.Schema({
   organizationId: {
@@ -36,4 +37,4 @@ const roleTemplateSchema = new mongoose.Schema({
 roleTemplateSchema.index({ organizationId: 1, roleName: 1 }, { unique: true });
 
 const RoleTemplate = mongoose.model('RoleTemplate', roleTemplateSchema);
-export default RoleTemplate;
+export default tenantModelProxy('RoleTemplate', roleTemplateSchema, RoleTemplate);

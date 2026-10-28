@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { tenantModelProxy } from '../tenancy/tenantContext.js';
 
 const organizationSchema = new mongoose.Schema({
   name: {
@@ -24,4 +25,4 @@ const organizationSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 const Organization = mongoose.model('Organization', organizationSchema);
-export default Organization;
+export default tenantModelProxy('Organization', organizationSchema, Organization);

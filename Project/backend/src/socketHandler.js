@@ -5,6 +5,10 @@ import ProjectNote from './models/ProjectNote.js';
 import ChatRoom from './models/ChatRoom.js';
 import User from './models/User.js';
 import { getOrCreateDefaultOrganization } from './utils/tenant.js';
+import { hasGlobalAccess } from './config/accessControl.js';
+import Company from './control/Company.js';
+import { getTenantModels, runWithTenant } from './tenancy/tenantContext.js';
+import { modelDefinitions } from './tenancy/modelRegistry.js';
 
 const jwtSecret = () => process.env.JWT_SECRET || 'doodlesaas_super_secret_key';
 
@@ -15,17 +19,19 @@ export default (io) => {
       if (!token) return next(new Error('Authentication required'));
 
       const decoded = jwt.verify(token, jwtSecret());
-      const user = await User.findById(decoded.id).select('-password');
-      if (!user) return next(new Error('User not found'));
-
-      if (!user.organizationId) {
-        const organization = await getOrCreateDefaultOrganization();
-        user.organizationId = organization._id;
-        await user.save();
-      }
-
-      socket.user = user;
-      next();
+      const company = decoded.companyId ? await Company.findOne({ _id: decoded.companyId, status: 'ACTIVE' }) : null;
+      const tenant = company ? getTenantModels(company.databaseName, modelDefinitions) : null;
+      await runWithTenant(tenant ? { ...tenant, company } : {}, async () => {
+        const user = await User.findById(decoded.id).select('-password');
+        if (!user) return next(new Error('User not found'));
+        if (user.accountStatus !== 'ACTIVE') return next(new Error('Account is not active'));
+        if (!user.organizationId) {
+          const organization = await getOrCreateDefaultOrganization(); user.organizationId = organization._id; await user.save();
+        }
+        socket.user = user; socket.tenantContext = tenant ? { ...tenant, company } : {};
+        socket.use((event, eventNext) => runWithTenant(socket.tenantContext, eventNext));
+        next();
+      });
     } catch {
       next(new Error('Invalid authentication token'));
     }
@@ -38,7 +44,7 @@ export default (io) => {
 
     socket.on('join-project-room', async ({ projectId }) => {
       try {
-        const isManager = ['Project Manager', 'Admin'].includes(socket.user.role);
+        const isManager = hasGlobalAccess(socket.user);
         const isMember = isManager || await ProjectMember.exists({
           organizationId: socket.user.organizationId,
           projectId,
@@ -88,7 +94,7 @@ export default (io) => {
           sender: socket.user._id,
           senderId: socket.user._id,
           senderName: socket.user.name,
-          senderRole: socket.user.role,
+          senderRole: socket.user.accessRole,
           content,
           fileUrl,
           fileName,

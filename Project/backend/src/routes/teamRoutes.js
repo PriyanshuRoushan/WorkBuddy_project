@@ -6,14 +6,13 @@ import {
   createStickyNote,
   deleteStickyNote
 } from '../controllers/teamController.js';
-import { protect, requireProjectManager } from '../middleware/authMiddleware.js';
+import { protect } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
 // Members routes
 router.route('/members')
-  .get(protect, getTeamMembers)
-  .post(protect, requireProjectManager, inviteTeamMember);
+  .get(protect, getTeamMembers);
 
 // Sticky notes routes
 router.route('/notes')

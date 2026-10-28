@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { tenantModelProxy } from '../tenancy/tenantContext.js';
 
 const messageSchema = new mongoose.Schema({
   organizationId: {
@@ -62,4 +63,4 @@ const messageSchema = new mongoose.Schema({
 messageSchema.index({ organizationId: 1, roomId: 1, createdAt: 1 });
 
 const Message = mongoose.model('Message', messageSchema);
-export default Message;
+export default tenantModelProxy('Message', messageSchema, Message);

@@ -37,11 +37,11 @@ api.interceptors.response.use(
 );
 
 // Authentication endpoints
-export const login = (email, password) => 
-  api.post('/auth/login', { email, password }).then(res => res.data);
+export const login = (email, password, companySlug) =>
+  api.post('/auth/login', { email, password, companySlug: companySlug || undefined }).then(res => res.data);
 
-export const register = (name, email, password, role) => 
-  api.post('/auth/register', { name, email, password, role }).then(res => res.data);
+export const inspectInvitation = token => api.get(`/auth/invitations/${token}`).then(res => res.data);
+export const acceptInvitation = (token, password) => api.post(`/auth/invitations/${token}/accept`, { password }).then(res => res.data);
 
 export const getMe = () => 
   api.get('/auth/me').then(res => res.data);
@@ -74,6 +74,20 @@ export const deleteEvent = (id) => api.delete(`/events/${id}`).then(res => res.d
 // Team endpoints
 export const getTeamMembers = () => api.get('/team/members').then(res => res.data);
 export const inviteTeamMember = (memberData) => api.post('/team/members', memberData).then(res => res.data);
+export const getPeople = () => api.get('/people').then(res => res.data);
+export const invitePerson = data => api.post('/people/invite', data).then(res => res.data);
+export const updatePerson = (id, data) => api.patch(`/people/${id}`, data).then(res => res.data);
+export const updateAccountStatus = (id, accountStatus) => api.patch(`/people/${id}/status`, { accountStatus }).then(res => res.data);
+export const getAnnouncements = () => api.get('/announcements').then(res => res.data);
+export const createAnnouncement = data => api.post('/announcements', data).then(res => res.data);
+export const markAnnouncementRead = id => api.patch(`/announcements/${id}/read`).then(res => res.data);
+export const getSubscription = () => api.get('/control/subscription').then(res => res.data);
+export const getSupportTickets = () => api.get('/control/support/tickets').then(res => res.data);
+export const createSupportTicket = data => api.post('/control/support/tickets', data).then(res => res.data);
+export const addSupportMessage = (id, message) => api.post(`/control/support/tickets/${id}/messages`, { message }).then(res => res.data);
+export const grantSupportAccess = (id, data) => api.post(`/control/support/tickets/${id}/access`, data).then(res => res.data);
+export const revokeSupportAccess = grantId => api.post(`/control/support/access/${grantId}/revoke`).then(res => res.data);
+export const getSupportAudit = () => api.get('/control/support/audit').then(res => res.data);
 export const getStickyNotes = () => api.get('/team/notes').then(res => res.data);
 export const createStickyNote = (noteData) => api.post('/team/notes', noteData).then(res => res.data);
 export const deleteStickyNote = (id) => api.delete(`/team/notes/${id}`).then(res => res.data);

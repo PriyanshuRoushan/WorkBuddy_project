@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { tenantModelProxy } from '../tenancy/tenantContext.js';
 
 const stickyNoteSchema = new mongoose.Schema({
   organizationId: {
@@ -30,4 +31,4 @@ const stickyNoteSchema = new mongoose.Schema({
 });
 
 const StickyNote = mongoose.model('StickyNote', stickyNoteSchema);
-export default StickyNote;
+export default tenantModelProxy('StickyNote', stickyNoteSchema, StickyNote);

@@ -13,6 +13,10 @@ import authRoutes from './routes/authRoutes.js';
 import eventRoutes from './routes/eventRoutes.js';
 import teamRoutes from './routes/teamRoutes.js';
 import collabRoutes from './routes/collabRoutes.js';
+import peopleRoutes from './routes/peopleRoutes.js';
+import announcementRoutes from './routes/announcementRoutes.js';
+import controlPlaneRoutes from './routes/controlPlaneRoutes.js';
+import internalSupportRoutes from './routes/internalSupportRoutes.js';
 import socketHandler from './socketHandler.js';
 
 dotenv.config();
@@ -45,6 +49,10 @@ app.use('/api/auth', authRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/team', teamRoutes);
 app.use('/api/collab', collabRoutes);
+app.use('/api/people', peopleRoutes);
+app.use('/api/announcements', announcementRoutes);
+app.use('/api/control', controlPlaneRoutes);
+app.use('/api/internal-support', internalSupportRoutes);
 
 app.get('/', (req, res) => {
     res.send('Hello from the WorkBuddy backend API!');

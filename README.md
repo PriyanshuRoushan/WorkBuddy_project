@@ -4,7 +4,9 @@ WorkBuddy is a full-stack team collaboration and project management app with a s
 
 ## Features
 
-- Account registration, login, and profile settings
+- Invite-only accounts, first-login password setup, and account suspension
+- Company hierarchy with access roles, job titles, departments, teams, reporting lines, and employee IDs
+- Targeted announcements with priorities, pinning, read state, and audience controls
 - Project creation, progress tracking, and collaborator management
 - Personal and project tasks with statuses, categories, assignees, and due dates
 - Project chat with replies, reactions, mentions, typing indicators, and read receipts
@@ -24,6 +26,7 @@ WorkBuddy is a full-stack team collaboration and project management app with a s
 | Authentication | JSON Web Tokens, bcrypt |
 | Real-time updates | Socket.IO |
 | File uploads | Multer, local disk storage |
+| Email invitations | Resend HTTP API |
 
 ## Project structure
 
@@ -79,10 +82,19 @@ Create `Project/backend/.env`:
 PORT=3001
 MONGO_URI=mongodb://127.0.0.1:27017/workbuddy
 JWT_SECRET=replace-with-a-long-random-secret
+SUPPORT_JWT_SECRET=replace-with-a-separate-long-random-secret
 FRONTEND_URL=http://localhost:5173
+CONTROL_DB_NAME=workbuddy_control
+# Optional comma-separated DNS fallback for mongodb+srv lookup failures
+MONGODB_DNS_SERVERS=1.1.1.1,8.8.8.8
+# Optional in local development; required to deliver invitation emails
+RESEND_API_KEY=re_your_api_key
+MAIL_FROM=WorkBuddy <onboarding@your-verified-domain.com>
 ```
 
-`FRONTEND_URL` accepts comma-separated origins. The database connection also accepts `MONGODB_URI` and the legacy spelling `MOGODB_URI`; use just one database URI variable. Without one, the backend defaults to `mongodb://localhost:27017/doodlesaas`.
+`FRONTEND_URL` accepts comma-separated origins. The database connection also accepts `MONGODB_URI` and the legacy spelling `MOGODB_URI`; use just one database URI variable. Without one, the backend defaults to `mongodb://localhost:27017/doodlesaas`. For Atlas `mongodb+srv` URLs, the backend automatically retries DNS lookup failures with Cloudflare and Google DNS. Set `MONGODB_DNS_SERVERS` to override those fallback servers.
+
+When `RESEND_API_KEY` is absent, invitations are not emailed and the development invite URL is returned to the CEO/HR screen and printed by the backend. In production, configure a Resend API key and a `MAIL_FROM` address on a verified domain.
 
 ### 3. Configure the frontend
 
@@ -110,26 +122,35 @@ Open [http://localhost:5173](http://localhost:5173). The API runs at [http://loc
 
 Alternatively, run `npm --prefix Project start` to launch both processes. This command uses `npx concurrently`, which may prompt to download the runner on first use.
 
-## Demo data
+## Initial company administrator
 
-To populate a development database:
+There is no public signup. The WorkBuddy operations team provisions each organization's first CEO or HR account with the backend-only command below:
 
 ```bash
-npm --prefix Project run seed
+PROVISION_ORG="Acme" \
+PROVISION_NAME="Aarav Mehta" \
+PROVISION_EMAIL="ceo@acme.com" \
+PROVISION_PASSWORD="a-long-temporary-password" \
+PROVISION_ROLE="CEO" \
+npm --prefix Project/backend run provision:admin
 ```
 
-**This deletes existing data in the configured database before creating demo records. Use a dedicated development database.**
+After login, that CEO or HR user invites employees from **People & hierarchy**. Each employee receives a single-use link valid for 72 hours and creates their password on first access. The account becomes active only after this step.
 
-Seeded accounts all use the password `password123`:
+The provisioning command creates a record in `workbuddy_control`, allocates a dedicated database named `workbuddy_company_<random-id>`, creates the tenant organization and first administrator there, registers the central login identity, and creates the initial subscription record.
 
-| Email | Role |
-| --- | --- |
-| `pm@workbuddy.com` | Project Manager |
-| `frontend@workbuddy.com` | Frontend Dev |
-| `backend@workbuddy.com` | Backend Dev |
-| `uiux@workbuddy.com` | UI UX Person |
-| `qa@workbuddy.com` | Observer |
-| `creator@workbuddy.com` | Admin |
+### WorkBuddy support accounts
+
+Support agents are separate from company users and use a different JWT secret and internal API namespace:
+
+```bash
+SUPPORT_NAME="WorkBuddy Support" \
+SUPPORT_EMAIL="support@workbuddy.example" \
+SUPPORT_PASSWORD="a-long-support-password" \
+npm --prefix Project/backend run provision:support
+```
+
+Support agents cannot use company APIs. Company accounts cannot use internal support APIs. A support agent can view company diagnostics only while a CEO/HR grant for the related ticket is active and includes `READ_DIAGNOSTICS`. Grants expire after at most 72 hours, can be revoked early, and diagnostic access is written to the central audit log.
 
 ## Commands
 
@@ -147,6 +168,8 @@ Run these from the repository root:
 | `npm --prefix Project/frontend run preview` | Preview the frontend build locally |
 | `npm --prefix Project/frontend run lint` | Run frontend ESLint checks |
 | `npm --prefix Project/backend start` | Start backend without Nodemon |
+| `npm --prefix Project/backend run provision:admin` | Provision the first CEO/HR account using environment variables |
+| `npm --prefix Project/backend run provision:support` | Provision a WorkBuddy internal support account |
 
 Back up existing data before running the v2 migration. It updates legacy users, project memberships, task assignees, and organization references. It is not needed for a fresh database populated by the current seed script.
 
@@ -158,17 +181,26 @@ The React app sends REST requests through `src/services/api.js`. The client atta
 
 Each project workspace loads project details, messages, whiteboard notes, and tasks through REST, then connects to an authenticated Socket.IO project room. Chat and whiteboard changes are persisted by socket handlers. Task changes are saved through REST and relayed to other clients through socket events.
 
-Managers and admins can create and edit projects and add teammates. Other users access projects through `ProjectMember` records. Project deletion also checks the creator, with an admin override.
+### Multi-company database isolation
+
+MongoDB uses a control-plane plus database-per-company layout:
+
+- `workbuddy_control` contains company routing, login identities, subscription references, support tickets, time-limited access grants, internal support accounts, and audit logs.
+- Every company receives a separate `workbuddy_company_<random-id>` database containing its employees, projects, tasks, chats, messages, announcements, events, and other workspace records.
+- JWTs contain the immutable control-plane company ID. The backend resolves the database name server-side and binds every Mongoose model to that database using request-local async context. Clients never supply database names.
+- Socket.IO connections perform the same company lookup and run events inside the resolved tenant context.
+
+Subscription data is available only through the CEO-protected API and UI. Payment card data is not stored in WorkBuddy; only payment-provider references belong in the control database.
+
+CEO and HR users have company-wide project and chat access. Managers and Team Heads administer assigned projects, while employees access projects through `ProjectMember` records. CEO and HR control accounts, access roles, reporting lines, transfers, and suspension. Team Heads can update job titles for employees in their own team.
 
 Uploads are stored in `Project/backend/uploads/` and served under `/uploads`. The current upload limit is 10 MB per file, with JPEG, PNG, WebP, PDF, plain text, and Word document types accepted.
 
 ## Current limitations
 
 - The calendar displays a fixed October 2024 grid and filters upcoming events to October/November 2024.
-- Registration places users in the default `WorkBuddy Studio` organization; separate organization onboarding is not implemented.
-- Adding a teammate creates an account with a generated password; email invitations and an account acceptance flow are not implemented.
 - Role templates, ratings, and collaboration metrics have database schemas but no corresponding API routes or application screens.
-- Production deployment needs further authentication and authorization review. Registration accepts a role, and JWT handling includes a development fallback secret.
+- The initial CEO/HR provision command uses a supplied password; production operations should deliver it through a secure channel and require a rotation policy.
 - The backend serves the API and uploads; hosting the frontend build requires a separate static host with SPA route fallback.
 
 See [the developer documentation](WorkBuddy_Developer_Documentation.md) for a longer module walkthrough. Some details there predate the organization and project membership migration; this README uses the current configuration names.

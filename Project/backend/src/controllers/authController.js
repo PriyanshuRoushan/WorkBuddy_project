@@ -1,59 +1,69 @@
 import User from '../models/User.js';
-import Project from '../models/Project.js';
-import ProjectMember from '../models/ProjectMember.js';
+import Invitation from '../models/Invitation.js';
 import jwt from 'jsonwebtoken';
-import { getOrCreateDefaultOrganization } from '../utils/tenant.js';
+import crypto from 'crypto';
+import Identity from '../control/Identity.js';
+import Company from '../control/Company.js';
+import { getTenantModels, runWithTenant } from '../tenancy/tenantContext.js';
+import { modelDefinitions } from '../tenancy/modelRegistry.js';
 
 // Helper to generate JWT Token
-const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET || 'doodlesaas_super_secret_key', {
+const generateToken = (id, companyId) => {
+  return jwt.sign({ id, companyId }, process.env.JWT_SECRET || 'doodlesaas_super_secret_key', {
     expiresIn: '30d'
   });
 };
 
-export const registerUser = async (req, res) => {
-  const { name, email, password, role } = req.body;
+const publicUser = user => ({
+  _id: user._id,
+  name: user.name,
+  email: user.email,
+  employeeId: user.employeeId,
+  accessRole: user.accessRole,
+  role: user.accessRole,
+  jobTitle: user.jobTitle,
+  department: user.department,
+  team: user.team,
+  accountStatus: user.accountStatus,
+  profileImage: user.profileImage,
+  organizationId: user.organizationId
+});
+
+export const inspectInvitation = async (req, res) => {
   try {
-    const organization = await getOrCreateDefaultOrganization();
-    const normalizedEmail = email.toLowerCase();
-    const userExists = await User.findOne({ organizationId: organization._id, email: normalizedEmail });
-    if (userExists) {
-      return res.status(400).json({ message: 'User already exists' });
-    }
-
-    const user = await User.create({
-      organizationId: organization._id,
-      name,
-      email: normalizedEmail,
-      password,
-      role
+    const tokenHash = crypto.createHash('sha256').update(req.params.token).digest('hex');
+    const identity = await Identity.findOne({ invitationTokenHash: tokenHash, status: 'PENDING' });
+    const company = identity ? await Company.findById(identity.companyId) : null;
+    if (!identity || !company) return res.status(404).json({ message: 'This invitation is invalid or has expired' });
+    const tenant = getTenantModels(company.databaseName, modelDefinitions);
+    await runWithTenant({ ...tenant, company }, async () => {
+      const invitation = await Invitation.findOne({ tokenHash, acceptedAt: null, revokedAt: null, expiresAt: { $gt: new Date() } }).populate('userId', 'name email employeeId jobTitle accessRole');
+      if (!invitation?.userId) return res.status(404).json({ message: 'This invitation is invalid or has expired' });
+      res.json({ user: publicUser(invitation.userId), company: company.name, expiresAt: invitation.expiresAt });
     });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
 
-    // Backfill project membership for legacy projects that still reference collaborator avatars.
-    if (user.profileImage) {
-      const matchingProjects = await Project.find({
-        organizationId: organization._id,
-        collaborators: user.profileImage
-      });
-      for (const project of matchingProjects) {
-        await ProjectMember.create({
-          organizationId: organization._id,
-          projectId: project._id,
-          userId: user._id,
-          email: user.email,
-          role: user.role
-        }).catch(err => console.log('Auto project member mapping check skipped:', err.message));
-      }
-    }
-
-    res.status(201).json({
-      _id: user._id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      profileImage: user.profileImage,
-      organizationId: user.organizationId,
-      token: generateToken(user._id)
+export const acceptInvitation = async (req, res) => {
+  const { password } = req.body;
+  if (!password || password.length < 8) return res.status(400).json({ message: 'Password must contain at least 8 characters' });
+  try {
+    const tokenHash = crypto.createHash('sha256').update(req.params.token).digest('hex');
+    const identity = await Identity.findOne({ invitationTokenHash: tokenHash, status: 'PENDING' });
+    const company = identity ? await Company.findById(identity.companyId) : null;
+    if (!identity || !company) return res.status(404).json({ message: 'This invitation is invalid or has expired' });
+    const tenant = getTenantModels(company.databaseName, modelDefinitions);
+    await runWithTenant({ ...tenant, company }, async () => {
+      const invitation = await Invitation.findOne({ tokenHash, acceptedAt: null, revokedAt: null, expiresAt: { $gt: new Date() } });
+      if (!invitation) return res.status(404).json({ message: 'This invitation is invalid or has expired' });
+      const user = await User.findById(invitation.userId).select('+password');
+      if (!user || user.accountStatus === 'SUSPENDED') return res.status(403).json({ message: 'This account is unavailable' });
+      user.password = password; user.accountStatus = 'ACTIVE'; await user.save();
+      invitation.acceptedAt = new Date(); await invitation.save();
+      identity.status = 'ACTIVE'; identity.invitationTokenHash = undefined; await identity.save();
+      res.json({ ...publicUser(user), companyId: company._id, token: generateToken(user._id, company._id) });
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -61,22 +71,23 @@ export const registerUser = async (req, res) => {
 };
 
 export const loginUser = async (req, res) => {
-  const { email, password } = req.body;
+  const { email, password, companySlug } = req.body;
   try {
-    const user = await User.findOne({ email: email.toLowerCase() });
-    if (user && (await user.matchPassword(password))) {
-      res.json({
-        _id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        profileImage: user.profileImage,
-        organizationId: user.organizationId,
-        token: generateToken(user._id)
-      });
-    } else {
+    const selectedCompany = companySlug ? await Company.findOne({ slug: companySlug.toLowerCase().trim(), status: 'ACTIVE' }) : null;
+    if (companySlug && !selectedCompany) return res.status(404).json({ message: 'Company workspace not found' });
+    const identities = await Identity.find({ email: email.toLowerCase(), status: { $ne: 'SUSPENDED' }, ...(selectedCompany && { companyId: selectedCompany._id }) });
+    if (identities.length !== 1) return res.status(identities.length > 1 ? 409 : 401).json({ message: identities.length > 1 ? 'This email belongs to multiple companies. Company selection is required.' : 'Invalid email or password' });
+    const identity = identities[0];
+    const company = await Company.findOne({ _id: identity.companyId, status: 'ACTIVE' });
+    if (!company) return res.status(403).json({ message: 'Company workspace is not active' });
+    const tenant = getTenantModels(company.databaseName, modelDefinitions);
+    await runWithTenant({ ...tenant, company }, async () => {
+      const user = await User.findById(identity.tenantUserId).select('+password');
+      if (user?.accountStatus === 'PENDING') return res.status(403).json({ message: 'Accept your email invitation and create a password first' });
+      if (user?.accountStatus === 'SUSPENDED') return res.status(403).json({ message: 'Your account has been suspended. Contact HR or your CEO.' });
+      if (user && await user.matchPassword(password)) return res.json({ ...publicUser(user), companyId: company._id, companyName: company.name, token: generateToken(user._id, company._id) });
       res.status(401).json({ message: 'Invalid email or password' });
-    }
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -97,14 +108,13 @@ export const getMe = async (req, res) => {
 
 export const updateProfile = async (req, res) => {
   try {
-    const user = await User.findById(req.user.id);
+    const user = await User.findById(req.user.id).select('+password');
     if (!user) return res.status(404).json({ message: 'User not found' });
 
     const oldEmail = user.email;
     const oldImage = user.profileImage;
 
     user.name = req.body.name || user.name;
-    user.email = req.body.email ? req.body.email.toLowerCase() : user.email;
     user.bio = req.body.bio !== undefined ? req.body.bio : user.bio;
     user.profileImage = req.body.profileImage || user.profileImage;
     user.sketchStyle = req.body.sketchStyle || user.sketchStyle;
@@ -131,14 +141,17 @@ export const updateProfile = async (req, res) => {
 
     await ProjectMember.updateMany(
       { organizationId: updatedUser.organizationId, userId: updatedUser._id },
-      { email: updatedUser.email, role: updatedUser.role }
+      { email: updatedUser.email }
     );
     
     res.json({
       _id: updatedUser._id,
       name: updatedUser.name,
       email: updatedUser.email,
-      role: updatedUser.role,
+      role: updatedUser.accessRole,
+      accessRole: updatedUser.accessRole,
+      jobTitle: updatedUser.jobTitle,
+      employeeId: updatedUser.employeeId,
       profileImage: updatedUser.profileImage,
       organizationId: updatedUser.organizationId,
       bio: updatedUser.bio,
@@ -146,7 +159,7 @@ export const updateProfile = async (req, res) => {
       gridDensity: updatedUser.gridDensity,
       notifySparks: updatedUser.notifySparks,
       notifyScribbles: updatedUser.notifyScribbles,
-      token: generateToken(updatedUser._id)
+      token: generateToken(updatedUser._id, req.company?._id)
     });
   } catch (error) {
     res.status(500).json({ message: error.message });

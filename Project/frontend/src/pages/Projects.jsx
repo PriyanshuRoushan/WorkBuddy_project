@@ -18,7 +18,7 @@ const Projects = () => {
   // Auth role check
   const userString = localStorage.getItem('user');
   const user = userString ? JSON.parse(userString) : null;
-  const isPM = user && user.role === 'Project Manager';
+  const isPM = user && ['CEO', 'HR', 'MANAGER', 'TEAM_HEAD'].includes(user.accessRole || user.role);
 
   const fetchProjects = async () => {
     try {
@@ -415,7 +415,7 @@ const Projects = () => {
                       <img src={member.profileImage} alt={member.name} className="w-8 h-8 rounded-full border border-on-background object-cover bg-white" />
                       <div>
                         <p className="leading-none">{member.name}</p>
-                        <p className="text-[10px] text-on-surface-variant leading-none mt-1 font-annotation">{member.role}</p>
+                        <p className="text-[10px] text-on-surface-variant leading-none mt-1 font-annotation">{member.jobTitle || member.accessRole}</p>
                       </div>
                     </label>
                   ))}

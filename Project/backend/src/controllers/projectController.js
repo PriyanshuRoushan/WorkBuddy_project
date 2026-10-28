@@ -4,6 +4,7 @@ import User from '../models/User.js';
 import ChatRoom from '../models/ChatRoom.js';
 import ProjectMember from '../models/ProjectMember.js';
 import { tenantFilter } from '../utils/tenant.js';
+import { hasGlobalAccess, PROJECT_ADMIN_ROLES, hasRole } from '../config/accessControl.js';
 
 const resolveUsers = async (organizationId, collaboratorValues = []) => {
   if (!collaboratorValues.length) return [];
@@ -15,7 +16,7 @@ const resolveUsers = async (organizationId, collaboratorValues = []) => {
       { profileImage: { $in: collaboratorValues } },
       { email: { $in: collaboratorValues.map(value => String(value).toLowerCase()) } }
     ]
-  }).select('_id name email role profileImage');
+  }).select('_id name email accessRole jobTitle profileImage');
 };
 
 const decorateProject = async (project) => {
@@ -24,7 +25,7 @@ const decorateProject = async (project) => {
   const memberships = await ProjectMember.find({
     organizationId: plainProject.organizationId,
     projectId: plainProject._id
-  }).populate('userId', 'name email role profileImage');
+  }).populate('userId', 'name email accessRole jobTitle profileImage employeeId');
 
   const collaboratorUsers = memberships
     .map(membership => membership.userId)
@@ -40,7 +41,7 @@ const decorateProject = async (project) => {
 };
 
 const assertProjectAccess = async (req, projectId) => {
-  if (req.user.role === 'Project Manager' || req.user.role === 'Admin') return true;
+  if (hasGlobalAccess(req.user)) return true;
   return Boolean(await ProjectMember.exists({
     organizationId: req.user.organizationId,
     projectId,
@@ -51,7 +52,7 @@ const assertProjectAccess = async (req, projectId) => {
 export const getProjects = async (req, res) => {
   try {
     let query = tenantFilter(req);
-    if (req.user.role !== 'Project Manager' && req.user.role !== 'Admin') {
+    if (!hasGlobalAccess(req.user)) {
       const memberships = await ProjectMember.find({
         organizationId: req.user.organizationId,
         userId: req.user._id
@@ -101,10 +102,10 @@ export const createProject = async (req, res) => {
 
     const collaboratorUsers = await resolveUsers(req.user.organizationId, collaborators);
     const members = [
-      { userId: req.user._id, email: req.user.email, role: 'Admin' },
+      { userId: req.user._id, email: req.user.email, role: 'PROJECT_LEAD' },
       ...collaboratorUsers
         .filter(user => user._id.toString() !== req.user._id.toString())
-        .map(user => ({ userId: user._id, email: user.email, role: 'Editor' }))
+        .map(user => ({ userId: user._id, email: user.email, role: 'CONTRIBUTOR' }))
     ];
 
     await ProjectMember.insertMany(members.map(member => ({
@@ -156,7 +157,7 @@ export const updateProject = async (req, res) => {
             userId: user._id
           },
           {
-            $set: { email: user.email, role: 'Editor' },
+            $set: { email: user.email, role: 'CONTRIBUTOR' },
             $setOnInsert: { organizationId: req.user.organizationId, projectId: project._id, userId: user._id }
           },
           { upsert: true }
@@ -194,7 +195,7 @@ export const deleteProject = async (req, res) => {
     if (!project) return res.status(404).json({ message: 'Project not found' });
 
     const creatorId = project.creatorId || project.creator;
-    if (creatorId && creatorId.toString() !== req.user._id.toString() && req.user.role !== 'Admin') {
+    if (creatorId && creatorId.toString() !== req.user._id.toString() && !hasGlobalAccess(req.user)) {
       return res.status(403).json({ message: 'Access denied: Only the project creator can delete this workspace.' });
     }
 

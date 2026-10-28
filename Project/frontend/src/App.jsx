@@ -6,8 +6,11 @@ import Projects from './pages/Projects';
 import Tasks from './pages/Tasks';
 import Calendar from './pages/Calendar';
 import Team from './pages/Team';
-import SignUp from './pages/SignUp';
 import Login from './pages/Login';
+import AcceptInvite from './pages/AcceptInvite';
+import Announcements from './pages/Announcements';
+import Billing from './pages/Billing';
+import Support from './pages/Support';
 import Settings from './pages/Settings';
 import ProjectWorkspace from './pages/ProjectWorkspace';
 
@@ -26,7 +29,7 @@ function App() {
       <Routes>
         {/* Public auth routes */}
         <Route path="/login" element={<Login />} />
-        <Route path="/signup" element={<SignUp />} />
+        <Route path="/accept-invite/:token" element={<AcceptInvite />} />
 
         {/* Protected workspace routes */}
         <Route
@@ -43,6 +46,9 @@ function App() {
           <Route path="tasks" element={<Tasks />} />
           <Route path="calendar" element={<Calendar />} />
           <Route path="team" element={<Team />} />
+          <Route path="announcements" element={<Announcements />} />
+          <Route path="billing" element={<Billing />} />
+          <Route path="support" element={<Support />} />
           <Route path="settings" element={<Settings />} />
           
           {/* Fallback */}

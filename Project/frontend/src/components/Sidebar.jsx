@@ -3,11 +3,16 @@ import { NavLink, useNavigate } from 'react-router-dom';
 
 const Sidebar = ({ onNewClick }) => {
   const navigate = useNavigate();
+  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const role = user.accessRole || user.role;
   const navItems = [
     { to: '/', label: 'Dashboard', icon: 'dashboard' },
     { to: '/projects', label: 'Projects', icon: 'folder_open' },
     { to: '/tasks', label: 'Tasks', icon: 'assignment' },
     { to: '/team', label: 'Team', icon: 'group' },
+    { to: '/announcements', label: 'Announcements', icon: 'campaign' },
+    ...(['CEO', 'HR'].includes(role) ? [{ to: '/support', label: 'Support', icon: 'support_agent' }] : []),
+    ...(role === 'CEO' ? [{ to: '/billing', label: 'Subscription', icon: 'payments' }] : []),
     { to: '/calendar', label: 'Calendar', icon: 'calendar_month' },
     { to: '/settings', label: 'Settings', icon: 'settings' },
   ];

@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { tenantModelProxy } from '../tenancy/tenantContext.js';
 
 const teamMemberSchema = new mongoose.Schema({
   name: {
@@ -32,4 +33,4 @@ const teamMemberSchema = new mongoose.Schema({
 });
 
 const TeamMember = mongoose.model('TeamMember', teamMemberSchema);
-export default TeamMember;
+export default tenantModelProxy('TeamMember', teamMemberSchema, TeamMember);

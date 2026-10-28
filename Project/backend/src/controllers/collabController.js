@@ -3,9 +3,10 @@ import Message from '../models/Message.js';
 import ProjectNote from '../models/ProjectNote.js';
 import ProjectMember from '../models/ProjectMember.js';
 import { tenantFilter } from '../utils/tenant.js';
+import { hasGlobalAccess } from '../config/accessControl.js';
 
 const canAccessProject = async (req, projectId) => {
-  if (req.user.role === 'Project Manager' || req.user.role === 'Admin') return true;
+  if (hasGlobalAccess(req.user)) return true;
   return Boolean(await ProjectMember.exists({
     organizationId: req.user.organizationId,
     projectId,

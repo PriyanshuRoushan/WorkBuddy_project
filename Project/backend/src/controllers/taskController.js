@@ -3,6 +3,7 @@ import User from '../models/User.js';
 import ProjectMember from '../models/ProjectMember.js';
 import Activity from '../models/Activity.js';
 import { tenantFilter } from '../utils/tenant.js';
+import { hasGlobalAccess } from '../config/accessControl.js';
 
 const resolveAssignee = async (organizationId, value, fallbackUser) => {
   if (!value) return fallbackUser;
@@ -23,7 +24,7 @@ const serializeTask = (task) => {
 };
 
 const canAccessProject = async (req, projectId) => {
-  if (!projectId || req.user.role === 'Project Manager' || req.user.role === 'Admin') return true;
+  if (!projectId || hasGlobalAccess(req.user)) return true;
   return Boolean(await ProjectMember.exists({
     organizationId: req.user.organizationId,
     projectId,
@@ -41,7 +42,7 @@ export const getTasks = async (req, res) => {
     const query = projectId
       ? tenantFilter(req, { projectId })
       : tenantFilter(req, { assignedTo: req.user._id });
-    const tasks = await Task.find(query).populate('assignedTo', 'name email role profileImage').sort({ updatedAt: -1 });
+    const tasks = await Task.find(query).populate('assignedTo', 'name email accessRole jobTitle profileImage').sort({ updatedAt: -1 });
     res.json(tasks.map(serializeTask));
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -92,7 +93,7 @@ export const createTask = async (req, res) => {
       type: 'add'
     });
 
-    await task.populate('assignedTo', 'name email role profileImage');
+    await task.populate('assignedTo', 'name email accessRole jobTitle profileImage');
     res.status(201).json(serializeTask(task));
   } catch (error) {
     res.status(400).json({ message: error.message });

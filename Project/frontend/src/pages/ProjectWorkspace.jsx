@@ -335,7 +335,7 @@ const ProjectWorkspace = () => {
       roomId: project?.chatRoomId || projectId, // fallback to project id
       sender: currentUser._id,
       senderName: currentUser.name,
-      senderRole: currentUser.role,
+      senderRole: currentUser.accessRole || currentUser.role,
       content: inputText,
       replyTo: replyToMessage?._id || null
     };
@@ -380,7 +380,7 @@ const ProjectWorkspace = () => {
         roomId: project?.chatRoomId || projectId,
         sender: currentUser._id,
         senderName: currentUser.name,
-        senderRole: currentUser.role,
+        senderRole: currentUser.accessRole || currentUser.role,
         content: `Sent an attachment: ${file.name}`,
         fileUrl: res.fileUrl,
         fileName: res.fileName,
@@ -930,7 +930,7 @@ const ProjectWorkspace = () => {
                       >
                         <option value="">Self (or select teammate)</option>
                         {getProjectTeammates().map(m => (
-                          <option key={m._id} value={m._id}>{m.name} ({m.role})</option>
+                          <option key={m._id} value={m._id}>{m.name} ({m.jobTitle || m.accessRole})</option>
                         ))}
                       </select>
                     </div>
@@ -1062,7 +1062,7 @@ const ProjectWorkspace = () => {
                         <div className="flex items-center gap-3 shrink-0">
                           {/* Assignee Avatar */}
                           {assignee ? (
-                            <div className="flex items-center gap-1.5" title={`${assignee.name} (${assignee.role})`}>
+                            <div className="flex items-center gap-1.5" title={`${assignee.name} (${assignee.jobTitle || assignee.accessRole})`}>
                               <img 
                                 src={assignee.profileImage} 
                                 alt={assignee.name} 

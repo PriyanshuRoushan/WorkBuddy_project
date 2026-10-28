@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { tenantModelProxy } from '../tenancy/tenantContext.js';
 
 const projectMemberSchema = new mongoose.Schema({
   organizationId: {
@@ -22,7 +23,22 @@ const projectMemberSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    required: true
+    enum: ['PROJECT_LEAD', 'DEVELOPER', 'REVIEWER', 'QA', 'OBSERVER', 'CONTRIBUTOR'],
+    default: 'CONTRIBUTOR'
+  },
+  allocationPercent: {
+    type: Number,
+    min: 0,
+    max: 100,
+    default: 100
+  },
+  startDate: {
+    type: Date,
+    default: Date.now
+  },
+  endDate: {
+    type: Date,
+    default: null
   }
 }, { timestamps: true });
 
@@ -31,4 +47,4 @@ projectMemberSchema.index({ projectId: 1, userId: 1 }, { unique: true });
 projectMemberSchema.index({ organizationId: 1, projectId: 1, userId: 1 }, { unique: true });
 
 const ProjectMember = mongoose.model('ProjectMember', projectMemberSchema);
-export default ProjectMember;
+export default tenantModelProxy('ProjectMember', projectMemberSchema, ProjectMember);

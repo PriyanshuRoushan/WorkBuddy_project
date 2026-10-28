@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { tenantModelProxy } from '../tenancy/tenantContext.js';
 
 const eventSchema = new mongoose.Schema({
   organizationId: {
@@ -33,4 +34,4 @@ const eventSchema = new mongoose.Schema({
 });
 
 const Event = mongoose.model('Event', eventSchema);
-export default Event;
+export default tenantModelProxy('Event', eventSchema, Event);

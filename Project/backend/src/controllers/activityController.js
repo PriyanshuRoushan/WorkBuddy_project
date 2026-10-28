@@ -1,10 +1,11 @@
 import Activity from '../models/Activity.js';
 import { tenantFilter } from '../utils/tenant.js';
+import { hasGlobalAccess } from '../config/accessControl.js';
 
 export const getActivities = async (req, res) => {
   try {
     let query = tenantFilter(req);
-    if (req.user && req.user.role !== 'Project Manager' && req.user.role !== 'Admin') {
+    if (req.user && !hasGlobalAccess(req.user)) {
       const firstName = req.user.name.split(' ')[0];
       query = tenantFilter(req, {
         $or: [

@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { tenantModelProxy } from '../tenancy/tenantContext.js';
 
 const chatRoomSchema = new mongoose.Schema({
   organizationId: {
@@ -28,4 +29,4 @@ const chatRoomSchema = new mongoose.Schema({
 chatRoomSchema.index({ organizationId: 1, projectId: 1 });
 
 const ChatRoom = mongoose.model('ChatRoom', chatRoomSchema);
-export default ChatRoom;
+export default tenantModelProxy('ChatRoom', chatRoomSchema, ChatRoom);

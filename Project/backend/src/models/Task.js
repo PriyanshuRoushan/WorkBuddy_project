@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { tenantModelProxy } from '../tenancy/tenantContext.js';
 
 const taskSchema = new mongoose.Schema({
   organizationId: {
@@ -65,4 +66,4 @@ taskSchema.index({ organizationId: 1, projectId: 1, status: 1 });
 taskSchema.index({ organizationId: 1, assignedTo: 1, status: 1 });
 
 const Task = mongoose.model('Task', taskSchema);
-export default Task;
+export default tenantModelProxy('Task', taskSchema, Task);

@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { tenantModelProxy } from '../tenancy/tenantContext.js';
 
 const ratingSchema = new mongoose.Schema({
   organizationId: {
@@ -37,4 +38,4 @@ ratingSchema.index({ organizationId: 1, targetUserId: 1, createdAt: -1 });
 ratingSchema.index({ organizationId: 1, projectId: 1 });
 
 const Rating = mongoose.model('Rating', ratingSchema);
-export default Rating;
+export default tenantModelProxy('Rating', ratingSchema, Rating);
