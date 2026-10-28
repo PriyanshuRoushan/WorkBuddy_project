@@ -14,6 +14,7 @@ const Sidebar = ({ onNewClick }) => {
     ...(['CEO', 'HR'].includes(role) ? [{ to: '/support', label: 'Support', icon: 'support_agent' }] : []),
     ...(role === 'CEO' ? [{ to: '/billing', label: 'Subscription', icon: 'payments' }] : []),
     { to: '/calendar', label: 'Calendar', icon: 'calendar_month' },
+    { to: '/profile', label: 'Profile', icon: 'account_circle' },
     { to: '/settings', label: 'Settings', icon: 'settings' },
   ];
 

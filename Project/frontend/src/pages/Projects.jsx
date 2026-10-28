@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useOutletContext, Link } from 'react-router-dom';
 import { getProjects, updateProject, deleteProject, getTeamMembers } from '../services/api';
+import Avatar from '../components/Avatar';
 
 const Projects = () => {
   const { searchQuery, refreshTrigger, setRefreshTrigger } = useOutletContext();
@@ -412,7 +413,7 @@ const Projects = () => {
                         onChange={() => handleToggleProjectCollaborator(member._id)}
                         className="rounded border-2 border-on-background text-primary focus:ring-primary focus:ring-offset-0 bg-transparent checked:bg-primary cursor-pointer w-4 h-4"
                       />
-                      <img src={member.profileImage} alt={member.name} className="w-8 h-8 rounded-full border border-on-background object-cover bg-white" />
+                      <Avatar name={member.name} src={member.profileImage} size="md" />
                       <div>
                         <p className="leading-none">{member.name}</p>
                         <p className="text-[10px] text-on-surface-variant leading-none mt-1 font-annotation">{member.jobTitle || member.accessRole}</p>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { io } from 'socket.io-client';
+import Avatar from '../components/Avatar';
 import { CONSTANT } from '../../constant';
 import { 
   getProject, 
@@ -1063,11 +1064,7 @@ const ProjectWorkspace = () => {
                           {/* Assignee Avatar */}
                           {assignee ? (
                             <div className="flex items-center gap-1.5" title={`${assignee.name} (${assignee.jobTitle || assignee.accessRole})`}>
-                              <img 
-                                src={assignee.profileImage} 
-                                alt={assignee.name} 
-                                className="w-7 h-7 rounded-full border border-on-background object-cover bg-white" 
-                              />
+                              <Avatar name={assignee.name} src={assignee.profileImage} size="sm" />
                               <span className="hidden md:inline font-annotation text-[9px] text-on-surface-variant font-bold truncate max-w-[60px]">
                                 {assignee.name.split(' ')[0]}
                               </span>
@@ -1298,7 +1295,7 @@ const ProjectWorkspace = () => {
                   onClick={() => handleSelectMention(member)}
                   className="w-full text-left px-2 py-1 text-xs font-bold hover:bg-primary-container transition-colors flex items-center gap-2 cursor-pointer"
                 >
-                  <img src={member.profileImage} alt="" className="w-4 h-4 rounded-full border border-on-background object-cover" />
+                  <Avatar name={member.name} src={member.profileImage} size="sm" className="!w-4 !h-4 !text-[7px]" />
                   <span className="truncate">{member.name}</span>
                 </button>
               ))}

@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Header from './Header';
+import Avatar from './Avatar';
 import { createProject, createTask, getTeamMembers } from '../services/api';
 
 const Layout = () => {
@@ -23,6 +24,11 @@ const Layout = () => {
 
   // Trigger page refreshes after data saves
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  useEffect(() => {
+    const stored = JSON.parse(localStorage.getItem('user') || '{}');
+    document.documentElement.dataset.theme = stored.themePreference || 'light';
+  }, [refreshTrigger]);
 
   const handleOpenModal = async () => {
     const userString = localStorage.getItem('user');
@@ -170,7 +176,7 @@ const Layout = () => {
                             onChange={() => handleToggleCollaborator(member._id)}
                             className="rounded border-2 border-on-background text-primary focus:ring-primary focus:ring-offset-0 bg-transparent checked:bg-primary cursor-pointer w-4 h-4"
                           />
-                          <img src={member.profileImage} alt={member.name} className="w-6 h-6 rounded-full border border-on-background object-cover" />
+                          <Avatar name={member.name} src={member.profileImage} size="sm" />
                           <span>{member.name} ({member.jobTitle || member.accessRole})</span>
                         </label>
                       ))}

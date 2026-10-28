@@ -1,4 +1,3 @@
-import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
@@ -6,11 +5,13 @@ import Projects from './pages/Projects';
 import Tasks from './pages/Tasks';
 import Calendar from './pages/Calendar';
 import Team from './pages/Team';
+import InviteEmployee from './pages/InviteEmployee';
 import Login from './pages/Login';
 import AcceptInvite from './pages/AcceptInvite';
 import Announcements from './pages/Announcements';
 import Billing from './pages/Billing';
 import Support from './pages/Support';
+import Profile from './pages/Profile';
 import Settings from './pages/Settings';
 import ProjectWorkspace from './pages/ProjectWorkspace';
 
@@ -46,10 +47,12 @@ function App() {
           <Route path="tasks" element={<Tasks />} />
           <Route path="calendar" element={<Calendar />} />
           <Route path="team" element={<Team />} />
+          <Route path="team/invite" element={<InviteEmployee />} />
           <Route path="announcements" element={<Announcements />} />
           <Route path="billing" element={<Billing />} />
           <Route path="support" element={<Support />} />
           <Route path="settings" element={<Settings />} />
+          <Route path="profile" element={<Profile />} />
           
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/" replace />} />

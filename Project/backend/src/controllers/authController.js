@@ -1,5 +1,7 @@
 import User from '../models/User.js';
 import Invitation from '../models/Invitation.js';
+import Project from '../models/Project.js';
+import ProjectMember from '../models/ProjectMember.js';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import Identity from '../control/Identity.js';
@@ -17,6 +19,7 @@ const generateToken = (id, companyId) => {
 const publicUser = user => ({
   _id: user._id,
   name: user.name,
+  displayName: user.displayName,
   email: user.email,
   employeeId: user.employeeId,
   accessRole: user.accessRole,
@@ -95,9 +98,9 @@ export const loginUser = async (req, res) => {
 
 export const getMe = async (req, res) => {
   try {
-    const user = await User.findById(req.user.id).select('-password');
+    const user = await User.findById(req.user.id).select('-password').populate('managerId', 'name employeeId jobTitle');
     if (user) {
-      res.json(user);
+      res.json({ ...user.toObject(), companyId: req.company?._id, companyName: req.company?.name });
     } else {
       res.status(404).json({ message: 'User not found' });
     }
@@ -114,15 +117,18 @@ export const updateProfile = async (req, res) => {
     const oldEmail = user.email;
     const oldImage = user.profileImage;
 
-    user.name = req.body.name || user.name;
+    if (req.body.displayName !== undefined && req.body.displayName.trim().length > 80) return res.status(400).json({ message: 'Display name must contain 80 characters or fewer' });
+    user.displayName = req.body.displayName !== undefined ? req.body.displayName.trim() : user.displayName;
     user.bio = req.body.bio !== undefined ? req.body.bio : user.bio;
-    user.profileImage = req.body.profileImage || user.profileImage;
+    user.profileImage = req.body.profileImage !== undefined ? req.body.profileImage : user.profileImage;
     user.sketchStyle = req.body.sketchStyle || user.sketchStyle;
     user.gridDensity = req.body.gridDensity !== undefined ? req.body.gridDensity : user.gridDensity;
     user.notifySparks = req.body.notifySparks !== undefined ? req.body.notifySparks : user.notifySparks;
     user.notifyScribbles = req.body.notifyScribbles !== undefined ? req.body.notifyScribbles : user.notifyScribbles;
+    user.themePreference = req.body.themePreference || user.themePreference;
 
     if (req.body.password) {
+      if (req.body.password.length < 8) return res.status(400).json({ message: 'New password must contain at least 8 characters' });
       if (!req.body.currentPassword || !(await user.matchPassword(req.body.currentPassword))) {
         return res.status(400).json({ message: 'Current password is incorrect' });
       }
@@ -147,11 +153,17 @@ export const updateProfile = async (req, res) => {
     res.json({
       _id: updatedUser._id,
       name: updatedUser.name,
+      displayName: updatedUser.displayName,
       email: updatedUser.email,
       role: updatedUser.accessRole,
       accessRole: updatedUser.accessRole,
       jobTitle: updatedUser.jobTitle,
       employeeId: updatedUser.employeeId,
+      department: updatedUser.department,
+      team: updatedUser.team,
+      accountStatus: updatedUser.accountStatus,
+      companyId: req.company?._id,
+      companyName: req.company?.name,
       profileImage: updatedUser.profileImage,
       organizationId: updatedUser.organizationId,
       bio: updatedUser.bio,
@@ -159,6 +171,7 @@ export const updateProfile = async (req, res) => {
       gridDensity: updatedUser.gridDensity,
       notifySparks: updatedUser.notifySparks,
       notifyScribbles: updatedUser.notifyScribbles,
+      themePreference: updatedUser.themePreference,
       token: generateToken(updatedUser._id, req.company?._id)
     });
   } catch (error) {

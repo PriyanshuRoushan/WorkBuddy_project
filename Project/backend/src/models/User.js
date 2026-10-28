@@ -17,6 +17,12 @@ const userSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
+  displayName: {
+    type: String,
+    trim: true,
+    maxlength: 80,
+    default: ''
+  },
   email: {
     type: String,
     required: true,
@@ -77,7 +83,7 @@ const userSchema = new mongoose.Schema({
   },
   profileImage: {
     type: String,
-    default: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBCKlzErB5bTRryWZ9kKt0oiK9DwbcHdLdJB9qybJhLy-dzJ5DM31amBATHedwlN3X9J7VD96TmCF3mFQcMczf8WTwvXqOHWAd44WpluP6efrp03TZotpx9kJuc2IrqAGsXcS_K6_GLEdcSkeQNN1f4J5thBvpNgg_chr5QC74edErxb-JF3PPjxApBzJtKa-NfCvyS-T1sD7yuzJb6-GlhxYHfE4AfkjDPYPfznuzdH46FkMEgleVV-s5nRecyZXxMB8TGuAAsSsJC'
+    default: ''
   },
   bio: {
     type: String,
