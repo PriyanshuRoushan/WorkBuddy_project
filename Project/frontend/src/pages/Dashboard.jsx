@@ -427,8 +427,8 @@ const Dashboard = () => {
             <div className="space-y-6">
               {activities.length > 0 ? (
                 activities.map((act) => (
-                  <div key={act._id} className="flex gap-4 relative">
-                    <div className="w-8 h-8 rounded-full border-2 border-on-background bg-white z-10 flex items-center justify-center shrink-0">
+                  <div key={act._id} className={`flex gap-4 relative ${act.notificationText ? 'bg-primary-container/60 border-2 border-primary p-3 rounded-lg shadow-[3px_3px_0_rgba(244,196,48,.35)]' : ''}`}>
+                    <div className={`w-8 h-8 rounded-full border-2 border-on-background z-10 flex items-center justify-center shrink-0 ${act.notificationText ? 'bg-primary-container' : 'bg-white'}`}>
                       <span className="material-symbols-outlined text-sm">
                         {act.type === 'add' ? 'add' : act.type === 'comment' ? 'comment' : act.type === 'check' ? 'check' : 'settings'}
                       </span>
