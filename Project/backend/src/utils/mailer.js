@@ -7,6 +7,18 @@ const invitationHtml = ({ name, inviterName, inviteUrl, expiresAt }) => `
     <p>This single-use link expires on ${expiresAt.toLocaleString()}.</p>
   </div>`;
 
+const DEVELOPMENT_SENDER = 'WorkBuddy <onboarding@resend.dev>';
+
+const getMailFrom = () => {
+  const configuredSender = process.env.MAIL_FROM?.trim();
+
+  if (!configuredSender || configuredSender.includes('your-verified-domain.com')) {
+    return DEVELOPMENT_SENDER;
+  }
+
+  return configuredSender;
+};
+
 export const sendInvitationEmail = async ({ to, name, inviterName, inviteUrl, expiresAt }) => {
   if (!process.env.RESEND_API_KEY) {
     console.log(`[invite:development] ${to}: ${inviteUrl}`);
@@ -20,7 +32,8 @@ export const sendInvitationEmail = async ({ to, name, inviterName, inviteUrl, ex
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      from: process.env.MAIL_FROM || 'WorkBuddy <onboarding@resend.dev>',
+      from: getMailFrom(),
+      reply_to: process.env.MAIL_REPLY_TO || 'teamworkbuddy@proton.me',
       to: [to],
       subject: 'You are invited to WorkBuddy',
       html: invitationHtml({ name, inviterName, inviteUrl, expiresAt })

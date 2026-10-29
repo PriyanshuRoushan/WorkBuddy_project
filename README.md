@@ -89,12 +89,13 @@ CONTROL_DB_NAME=workbuddy_control
 MONGODB_DNS_SERVERS=1.1.1.1,8.8.8.8
 # Optional in local development; required to deliver invitation emails
 RESEND_API_KEY=re_your_api_key
-MAIL_FROM=WorkBuddy <onboarding@your-verified-domain.com>
+MAIL_FROM=WorkBuddy <onboarding@resend.dev>
+MAIL_REPLY_TO=teamworkbuddy@proton.me
 ```
 
 `FRONTEND_URL` accepts comma-separated origins. The database connection also accepts `MONGODB_URI` and the legacy spelling `MOGODB_URI`; use just one database URI variable. Without one, the backend defaults to `mongodb://localhost:27017/doodlesaas`. For Atlas `mongodb+srv` URLs, the backend automatically retries DNS lookup failures with Cloudflare and Google DNS. Set `MONGODB_DNS_SERVERS` to override those fallback servers.
 
-When `RESEND_API_KEY` is absent, invitations are not emailed and the development invite URL is returned to the CEO/HR screen and printed by the backend. In production, configure a Resend API key and a `MAIL_FROM` address on a verified domain.
+When `RESEND_API_KEY` is absent, invitations are not emailed and the development invite URL is returned to the CEO/HR screen and printed by the backend. During development, Resend's `onboarding@resend.dev` test sender is used and replies are directed to `MAIL_REPLY_TO`. In production, configure a Resend API key and change `MAIL_FROM` to an address on a domain verified in Resend.
 
 ### 3. Configure the frontend
 
