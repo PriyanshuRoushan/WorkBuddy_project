@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { DndContext, PointerSensor, useDroppable, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { useOutletContext } from 'react-router-dom';
+import { Link, useOutletContext } from 'react-router-dom';
 import { getProjects, getTasks, getActivities, updateTask } from '../services/api';
 
 const TaskCard = ({ task, status, onMoveTask }) => {
@@ -441,13 +441,16 @@ const Dashboard = () => {
                         </span>
                       </p>
                       {act.details && (
-                        <div className="mt-2 p-2 bg-primary-container/30 border border-on-background text-xs font-annotation rounded">
+                        <div className={`mt-2 p-2 border border-on-background text-xs font-annotation rounded ${act.priority === 'URGENT' ? 'bg-error-container text-on-error-container' : 'bg-primary-container/30'}`}>
                           {act.details}
                         </div>
                       )}
-                      <p className="font-annotation text-[10px] text-on-surface-variant opacity-60 mt-1">
-                        {formatTimeAgo(act.createdAt)}
-                      </p>
+                      <div className="flex items-center justify-between gap-3 mt-2">
+                        <p className="font-annotation text-[10px] text-on-surface-variant opacity-60">
+                          {formatTimeAgo(act.createdAt)}
+                        </p>
+                        {act.link && <Link to={act.link} className="inline-flex items-center gap-1 border border-on-background px-2 py-1 text-[10px] font-bold bg-white hover:bg-primary-container">Open <span className="material-symbols-outlined text-xs">arrow_forward</span></Link>}
+                      </div>
                     </div>
                   </div>
                 ))
