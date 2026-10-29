@@ -104,6 +104,8 @@ cd Project/backend
 npm run sync:companies
 ```
 
+To copy legacy control collections from the MongoDB URI's default database into the separate `workbuddy_control` database, run `npm run migrate:control-db`. The command verifies documents and indexes and retains the source collections as a rollback backup.
+
 ### 3. Configure the frontend
 
 Create `Project/frontend/.env`:
