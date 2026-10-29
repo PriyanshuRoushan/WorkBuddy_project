@@ -42,7 +42,7 @@ export default (io) => {
       return socket.projectId && socket.projectId.toString() === projectId.toString();
     };
 
-    socket.on('join-project-room', async ({ projectId }) => {
+    socket.on('join-project-room', async ({ projectId }, acknowledge = () => {}) => {
       try {
         const isManager = hasGlobalAccess(socket.user);
         const isMember = isManager || await ProjectMember.exists({
@@ -52,7 +52,9 @@ export default (io) => {
         });
 
         if (!isMember) {
-          socket.emit('error-message', { message: 'Access denied: You are not a member of this project.' });
+          const message = 'Access denied: You are not a member of this project.';
+          socket.emit('error-message', { message });
+          acknowledge({ ok: false, message });
           return;
         }
 
@@ -62,8 +64,10 @@ export default (io) => {
           userId: socket.user._id,
           status: 'online'
         });
+        acknowledge({ ok: true });
       } catch (error) {
         console.error('Socket join room error:', error);
+        acknowledge({ ok: false, message: 'Could not join the project chat.' });
       }
     });
 
@@ -77,16 +81,24 @@ export default (io) => {
       socket.projectId = null;
     });
 
-    socket.on('send-message', async (messageData) => {
+    socket.on('send-message', async (messageData, acknowledge = () => {}) => {
       const { projectId, content, fileUrl, fileName, fileType, replyTo } = messageData;
-      if (!isActiveProject(projectId)) return;
+      if (!isActiveProject(projectId)) {
+        const message = 'Project chat is reconnecting. Please try sending again.';
+        socket.emit('error-message', { message });
+        acknowledge({ ok: false, message });
+        return;
+      }
 
       try {
         const room = await ChatRoom.findOne({
           organizationId: socket.user.organizationId,
           projectId
         });
-        if (!room) return;
+        if (!room) {
+          acknowledge({ ok: false, message: 'Project chat room was not found.' });
+          return;
+        }
 
         const savedMessage = await Message.create({
           organizationId: socket.user.organizationId,
@@ -107,8 +119,12 @@ export default (io) => {
           ? await Message.findById(savedMessage._id).populate('replyTo')
           : savedMessage;
         io.to(projectId).emit('receive-message', populatedMessage);
+        acknowledge({ ok: true, messageId: savedMessage._id });
       } catch (error) {
         console.error('Socket send-message error:', error);
+        const message = 'Your message could not be sent.';
+        socket.emit('error-message', { message });
+        acknowledge({ ok: false, message });
       }
     });
 

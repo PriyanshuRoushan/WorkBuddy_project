@@ -129,10 +129,12 @@ const ProjectWorkspace = () => {
           auth: { token }
         });
 
-        // On socket connect, join project room
-        socketRef.current.emit('join-project-room', {
-          projectId,
-          userId: currentUser._id
+        // Rejoin after every connection, including automatic reconnects after a backend restart.
+        socketRef.current.on('connect', () => {
+          socketRef.current.emit('join-project-room', { projectId }, response => {
+            if (!response?.ok) setError(response?.message || 'Could not join the project chat.');
+            else setError('');
+          });
         });
 
         // Socket Event Listeners
@@ -330,6 +332,10 @@ const ProjectWorkspace = () => {
   const handleSendMessage = (e) => {
     e?.preventDefault();
     if (!inputText.trim() && !fileUploading) return;
+    if (!socketRef.current?.connected) {
+      setError('Project chat is reconnecting. Wait a moment and try again.');
+      return;
+    }
 
     const messageData = {
       projectId,
@@ -341,10 +347,16 @@ const ProjectWorkspace = () => {
       replyTo: replyToMessage?._id || null
     };
 
-    socketRef.current.emit('send-message', messageData);
-    setInputText('');
-    setReplyToMessage(null);
-    setShowMentionDropdown(false);
+    socketRef.current.timeout(5000).emit('send-message', messageData, (timeoutError, response) => {
+      if (timeoutError || !response?.ok) {
+        setError(response?.message || 'Message was not sent. Please try again.');
+        return;
+      }
+      setInputText('');
+      setReplyToMessage(null);
+      setShowMentionDropdown(false);
+      setError('');
+    });
 
     // Stop typing immediately
     if (isTyping) {
@@ -389,11 +401,18 @@ const ProjectWorkspace = () => {
         replyTo: replyToMessage?._id || null
       };
 
-      socketRef.current.emit('send-message', messageData);
-      setReplyToMessage(null);
+      if (!socketRef.current?.connected) throw new Error('Project chat is reconnecting.');
+      socketRef.current.timeout(5000).emit('send-message', messageData, (timeoutError, response) => {
+        if (timeoutError || !response?.ok) {
+          setError(response?.message || 'Attachment message was not sent. Please try again.');
+          return;
+        }
+        setReplyToMessage(null);
+        setError('');
+      });
     } catch (err) {
       console.error('File upload error:', err);
-      alert('Error uploading file attachment.');
+      setError(err.message || 'Error uploading file attachment.');
     } finally {
       setFileUploading(false);
     }
