@@ -114,6 +114,21 @@ export const createProject = async (req, res) => {
       ...member
     })));
 
+    if (collaboratorUsers.length) {
+      await Activity.insertMany(collaboratorUsers
+        .filter(user => user._id.toString() !== req.user._id.toString())
+        .map(user => ({
+          organizationId: req.user.organizationId,
+          actorId: req.user._id,
+          projectId: project._id,
+          user: req.user.name.split(' ')[0],
+          action: `added ${user.name} to`,
+          target: project.title,
+          type: 'add',
+          link: `/projects/${project._id}/workspace`
+        })));
+    }
+
     await Activity.create({
       organizationId: req.user.organizationId,
       actorId: req.user._id,
@@ -142,6 +157,14 @@ export const updateProject = async (req, res) => {
 
     if (Array.isArray(collaborators)) {
       const collaboratorUsers = await resolveUsers(req.user.organizationId, collaborators);
+      const existingMemberIds = new Set((await ProjectMember.find({
+        organizationId: req.user.organizationId,
+        projectId: project._id
+      }).distinct('userId')).map(String));
+      const newlyAddedUsers = collaboratorUsers.filter(user =>
+        user._id.toString() !== String(project.creatorId || project.creator)
+        && !existingMemberIds.has(String(user._id))
+      );
       await ProjectMember.deleteMany({
         organizationId: req.user.organizationId,
         projectId: project._id,
@@ -162,6 +185,18 @@ export const updateProject = async (req, res) => {
           },
           { upsert: true }
         );
+      }
+      if (newlyAddedUsers.length) {
+        await Activity.insertMany(newlyAddedUsers.map(user => ({
+          organizationId: req.user.organizationId,
+          actorId: req.user._id,
+          projectId: project._id,
+          user: req.user.name.split(' ')[0],
+          action: `added ${user.name} to`,
+          target: project.title,
+          type: 'add',
+          link: `/projects/${project._id}/workspace`
+        })));
       }
     }
 

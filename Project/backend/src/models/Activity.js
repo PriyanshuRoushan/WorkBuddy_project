@@ -16,6 +16,11 @@ const activitySchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
   },
+  projectId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Project',
+    index: true
+  },
   action: {
     type: String,
     required: true
@@ -25,6 +30,9 @@ const activitySchema = new mongoose.Schema({
     required: true
   },
   details: {
+    type: String
+  },
+  link: {
     type: String
   },
   type: {

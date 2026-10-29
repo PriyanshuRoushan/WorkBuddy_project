@@ -24,13 +24,19 @@ const visibleAnnouncementQuery = async user => {
 
 export const getActivities = async (req, res) => {
   try {
-    let query = tenantFilter(req);
+    let query = tenantFilter(req, { action: { $ne: 'invited employee' } });
     if (req.user && !hasGlobalAccess(req.user)) {
       const firstName = req.user.name.split(' ')[0];
+      const memberProjectIds = await ProjectMember.find({
+        organizationId: req.user.organizationId,
+        userId: req.user._id
+      }).distinct('projectId');
       query = tenantFilter(req, {
+        action: { $ne: 'invited employee' },
         $or: [
           { user: firstName },
-          { user: 'System' }
+          { user: 'System' },
+          { projectId: { $in: memberProjectIds } }
         ]
       });
     }

@@ -2,7 +2,6 @@ import crypto from 'crypto';
 import User from '../models/User.js';
 import Organization from '../models/Organization.js';
 import Invitation from '../models/Invitation.js';
-import Activity from '../models/Activity.js';
 import { generateEmployeeId } from '../utils/employeeId.js';
 import { sendInvitationEmail } from '../utils/mailer.js';
 import { ACCESS_ROLES, isRoleBelow } from '../config/accessControl.js';
@@ -66,7 +65,6 @@ export const invitePerson = async (req, res) => {
       await User.deleteOne({ _id: user._id });
       throw error;
     }
-    await Activity.create({ organizationId: organization._id, actorId: req.user._id, user: req.user.name, action: 'invited employee', target: user.name, type: 'add' });
     res.status(201).json({ user, emailDelivered: mail.delivered, ...(mail.developmentUrl && { developmentInviteUrl: mail.developmentUrl }) });
   } catch (error) { res.status(400).json({ message: error.message }); }
 };
