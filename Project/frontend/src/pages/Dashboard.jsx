@@ -435,10 +435,10 @@ const Dashboard = () => {
                     </div>
                     <div className="flex-grow">
                       <p className="font-body-md text-sm text-on-surface">
-                        <span className="font-bold">{act.user}</span> {act.action}{' '}
-                        <span className={act.type === 'comment' ? 'italic' : 'underline'}>
-                          {act.target}
-                        </span>
+                        {act.notificationText ? <span className="font-bold">{act.notificationText}</span> : <>
+                          <span className="font-bold">{act.user}</span> {act.action}{' '}
+                          <span className={act.type === 'comment' ? 'italic' : 'underline'}>{act.target}</span>
+                        </>}
                       </p>
                       {act.details && (
                         <div className={`mt-2 p-2 border border-on-background text-xs font-annotation rounded ${act.priority === 'URGENT' ? 'bg-error-container text-on-error-container' : 'bg-primary-container/30'}`}>

@@ -61,7 +61,8 @@ export const getActivities = async (req, res) => {
         .lean(),
       Message.find({
         organizationId: req.user.organizationId,
-        roomId: { $in: accessibleRooms.map(room => room._id) }
+        roomId: { $in: accessibleRooms.map(room => room._id) },
+        sender: { $ne: req.user._id }
       })
         .sort({ createdAt: -1 })
         .limit(15)
@@ -96,10 +97,7 @@ export const getActivities = async (req, res) => {
       const projectId = projectIdByRoom.get(String(message.roomId));
       return {
         _id: `chat-${message._id}`,
-        user: message.senderName,
-        action: 'posted a new message in',
-        target: projectTitles.get(String(projectId)) || 'Project chat',
-        details: message.content || (message.fileName ? `Shared ${message.fileName}` : 'Shared an attachment'),
+        notificationText: `A message in ${projectTitles.get(String(projectId)) || 'Project chat'} from ${message.senderName}`,
         type: 'comment',
         link: `/projects/${projectId}/workspace`,
         createdAt: message.createdAt
