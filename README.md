@@ -99,6 +99,8 @@ When `RESEND_API_KEY` is absent, invitations are not emailed and the development
 
 The `workbuddy_control` database is the platform registry. Its `control_companies` collection stores the public company ID, owner, subscription summary, lifecycle status, tenant database name, contact information, and synchronized user/project counts. Each company's operational data remains isolated in its own tenant database. Synchronize existing registry records with:
 
+New companies are registered automatically whenever a `ControlCompany` is created. The model generates the public company ID and owner/contact defaults, while subscription model hooks keep the embedded subscription summary synchronized for internal platform reporting.
+
 ```bash
 cd Project/backend
 npm run sync:companies

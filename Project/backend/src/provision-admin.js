@@ -26,11 +26,7 @@ try {
   const databaseName = `workbuddy_company_${crypto.randomBytes(8).toString('hex')}`;
   const email = process.env.PROVISION_EMAIL.trim().toLowerCase();
   if (await Company.exists({ $or: [{ slug }, { ownerEmail: email }] })) throw new Error('Company or owner email already exists');
-  const companyObjectId = new mongoose.Types.ObjectId();
-  const companyId = `WB-CMP-${companyObjectId.toString().slice(-8).toUpperCase()}`;
   const company = await Company.create({
-    _id: companyObjectId,
-    companyId,
     name: companyName,
     slug,
     databaseName,

@@ -33,4 +33,11 @@ const schema = new mongoose.Schema({
   provisionedAt: Date
 }, { timestamps: true });
 
+schema.pre('validate', function () {
+  if (!this.companyId) this.companyId = `WB-CMP-${this._id.toString().slice(-8).toUpperCase()}`;
+  if (!this.owner?.email) this.set('owner.email', this.ownerEmail);
+  if (!this.contactEmail) this.contactEmail = this.ownerEmail;
+  if (!this.metrics?.lastSyncedAt) this.set('metrics.lastSyncedAt', new Date());
+});
+
 export default mongoose.model('ControlCompany', schema, 'control_companies');
