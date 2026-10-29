@@ -1,5 +1,8 @@
 import Activity from '../models/Activity.js';
 import Announcement from '../models/Announcement.js';
+import ChatRoom from '../models/ChatRoom.js';
+import Message from '../models/Message.js';
+import Project from '../models/Project.js';
 import ProjectMember from '../models/ProjectMember.js';
 import { tenantFilter } from '../utils/tenant.js';
 import { hasGlobalAccess } from '../config/accessControl.js';
@@ -32,7 +35,16 @@ export const getActivities = async (req, res) => {
       });
     }
     const announcementVisibility = await visibleAnnouncementQuery(req.user);
-    const [activities, announcements] = await Promise.all([
+    const accessibleProjectIds = hasGlobalAccess(req.user)
+      ? await ChatRoom.find({ organizationId: req.user.organizationId }).distinct('projectId')
+      : await ProjectMember.find({ organizationId: req.user.organizationId, userId: req.user._id }).distinct('projectId');
+    const accessibleRooms = await ChatRoom.find({
+      organizationId: req.user.organizationId,
+      projectId: { $in: accessibleProjectIds }
+    }).select('_id projectId').lean();
+    const projectIdByRoom = new Map(accessibleRooms.map(room => [String(room._id), room.projectId]));
+
+    const [activities, announcements, chatMessages] = await Promise.all([
       Activity.find(query).sort({ createdAt: -1 }).limit(15).lean(),
       Announcement.find({
         organizationId: req.user.organizationId,
@@ -44,6 +56,13 @@ export const getActivities = async (req, res) => {
       })
         .populate('authorId', 'name')
         .populate('projectId', 'title')
+        .sort({ createdAt: -1 })
+        .limit(15)
+        .lean(),
+      Message.find({
+        organizationId: req.user.organizationId,
+        roomId: { $in: accessibleRooms.map(room => room._id) }
+      })
         .sort({ createdAt: -1 })
         .limit(15)
         .lean()
@@ -61,7 +80,33 @@ export const getActivities = async (req, res) => {
       createdAt: item.createdAt
     }));
 
-    res.json([...activities, ...messageActivities]
+    const projectTitles = new Map(announcements
+      .filter(item => item.projectId)
+      .map(item => [String(item.projectId._id), item.projectId.title]));
+    const projectIdsMissingTitles = accessibleProjectIds.filter(id => !projectTitles.has(String(id)));
+    if (projectIdsMissingTitles.length) {
+      const projects = await Project.find({
+        organizationId: req.user.organizationId,
+        _id: { $in: projectIdsMissingTitles }
+      }).select('title').lean();
+      projects.forEach(project => projectTitles.set(String(project._id), project.title));
+    }
+
+    const chatActivities = chatMessages.map(message => {
+      const projectId = projectIdByRoom.get(String(message.roomId));
+      return {
+        _id: `chat-${message._id}`,
+        user: message.senderName,
+        action: 'posted a new message in',
+        target: projectTitles.get(String(projectId)) || 'Project chat',
+        details: message.content || (message.fileName ? `Shared ${message.fileName}` : 'Shared an attachment'),
+        type: 'comment',
+        link: `/projects/${projectId}/workspace`,
+        createdAt: message.createdAt
+      };
+    });
+
+    res.json([...activities, ...messageActivities, ...chatActivities]
       .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
       .slice(0, 15));
   } catch (error) {
