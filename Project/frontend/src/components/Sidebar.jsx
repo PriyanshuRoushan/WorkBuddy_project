@@ -1,87 +1,20 @@
-import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 
-const Sidebar = ({ onNewClick }) => {
-  const navigate = useNavigate();
-  const user = JSON.parse(localStorage.getItem('user') || '{}');
-  const role = user.accessRole || user.role;
-  const navItems = [
-    { to: '/', label: 'Dashboard', icon: 'dashboard' },
-    { to: '/projects', label: 'Projects', icon: 'folder_open' },
-    { to: '/tasks', label: 'Tasks', icon: 'assignment' },
-    { to: '/team', label: 'Team', icon: 'group' },
-    { to: '/announcements', label: 'Announcements', icon: 'campaign' },
-    ...(['CEO', 'HR'].includes(role) ? [{ to: '/support', label: 'Support', icon: 'support_agent' }] : []),
-    ...(role === 'CEO' ? [{ to: '/billing', label: 'Subscription', icon: 'payments' }] : []),
-    { to: '/calendar', label: 'Calendar', icon: 'calendar_month' },
-    { to: '/profile', label: 'Profile', icon: 'account_circle' },
-    { to: '/settings', label: 'Settings', icon: 'settings' },
-  ];
-
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    navigate('/login');
-  };
-
-  return (
-    <aside className="h-screen w-64 border-r-2 border-on-background bg-surface flex flex-col p-margin shrink-0">
-      <div className="mb-10">
-        <h1 className="font-headline-md text-headline-md text-primary font-bold">WorkBuddy</h1>
-        <p className="font-annotation text-annotation text-on-surface-variant opacity-70">Creative Workspace</p>
-      </div>
-
-      <nav className="space-y-4 flex-grow">
-        {navItems.map((item) => {
-          if (item.disabled) {
-            return (
-              <div
-                key={item.label}
-                className="flex items-center gap-3 p-3 text-on-surface-variant opacity-50 cursor-not-allowed group"
-                title="Coming Soon!"
-              >
-                <span className="material-symbols-outlined">{item.icon}</span>
-                <span className="font-body-md">{item.label}</span>
-              </div>
-            );
-          }
-
-          return (
-            <NavLink
-              key={item.label}
-              to={item.to}
-              className={({ isActive }) =>
-                isActive
-                  ? "flex items-center gap-3 p-3 text-primary font-bold border-2 border-on-background bg-primary-container rounded-lg rotate-[-1deg] transition-all shadow-[2px_2px_0px_0px_rgba(28,27,27,0.1)]"
-                  : "flex items-center gap-3 p-3 text-on-surface-variant hover:rotate-[1deg] transition-transform hover:bg-surface-container-high group rounded-lg"
-              }
-            >
-              <span className="material-symbols-outlined group-hover:jiggle">{item.icon}</span>
-              <span className="font-body-md">{item.label}</span>
-            </NavLink>
-          );
-        })}
-      </nav>
-
-      <div className="space-y-3 mt-auto">
-        <button
-          onClick={handleLogout}
-          className="w-full py-2 border-2 border-on-background hover:bg-error-container hover:text-on-error-container transition-colors flex items-center justify-center gap-2 cursor-pointer font-annotation text-xs rounded"
-        >
-          <span className="material-symbols-outlined text-sm">logout</span>
-          <span>Log Out</span>
-        </button>
-
-        <button
-          onClick={onNewClick}
-          className="w-full py-4 px-6 bg-primary-container border-2 border-on-background rough-border font-headline-sm text-headline-sm hover:jiggle transition-all active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
-        >
-          <span className="material-symbols-outlined">add_circle</span>
-          New Idea
-        </button>
-      </div>
-    </aside>
-  );
+const item = (to, label, icon) => ({ to, label, icon });
+const common = { dashboard: item('/', 'Dashboard', 'dashboard'), announcements: item('/announcements', 'Announcements', 'campaign'), support: item('/support', 'Support', 'support_agent'), profile: item('/profile', 'Profile', 'account_circle'), settings: item('/settings', 'Settings', 'settings') };
+const navigationByRole = {
+  CEO: [common.dashboard,item('/projects','All Projects','folder_open'),item('/tasks','All Tasks','assignment'),item('/team','Team & Employees','groups'),item('/hr-roles','HR & Roles','badge'),common.announcements,common.support,item('/billing','Subscription & Billing','payments'),item('/calendar','Calendar','calendar_month'),item('/reports','Reports & Analytics','analytics'),item('/organization-settings','Organization Settings','corporate_fare'),common.profile],
+  HR: [common.dashboard,item('/team','Employees','groups'),item('/attendance','Attendance & Leave','event_available'),item('/projects','Projects Overview','folder_open'),item('/tasks','Task Overview','assignment'),common.announcements,item('/calendar','Calendar & Events','calendar_month'),item('/reports','HR Reports','analytics'),common.support,common.profile,common.settings],
+  MANAGER: [common.dashboard,item('/projects','My Projects','folder_open'),item('/tasks','Task Management','assignment'),item('/team','My Team','groups'),item('/calendar','Project Calendar','calendar_month'),item('/reports','Project Reports','analytics'),common.announcements,common.support,common.profile,common.settings],
+  TEAM_HEAD: [common.dashboard,item('/projects','My Projects','folder_open'),item('/tasks','Task Management','assignment'),item('/team','My Team','groups'),item('/calendar','Project Calendar','calendar_month'),item('/reports','Project Reports','analytics'),common.announcements,common.support,common.profile,common.settings],
+  EMPLOYEE: [common.dashboard,item('/tasks','My Tasks','assignment'),item('/projects','My Projects','folder_open'),item('/calendar','My Calendar','calendar_month'),item('/attendance','Attendance & Leave','event_available'),common.announcements,item('/team','Team','groups'),common.support,common.profile,common.settings],
+  VIEWER: [common.dashboard,item('/tasks','My Tasks','assignment'),item('/projects','My Projects','folder_open'),common.announcements,common.support,common.profile,common.settings]
 };
+const roleLabels = { CEO:'Owner / Admin', HR:'Human Resources', MANAGER:'Manager', TEAM_HEAD:'Team Head', EMPLOYEE:'Employee', VIEWER:'Viewer' };
 
+const Sidebar = ({ onNewClick }) => {
+  const navigate=useNavigate(); const user=JSON.parse(localStorage.getItem('user')||'{}'); const role=user.accessRole||user.role||'EMPLOYEE'; const navItems=navigationByRole[role]||navigationByRole.EMPLOYEE;
+  const logout=()=>{localStorage.removeItem('token');localStorage.removeItem('user');navigate('/login');};
+  return <aside className="h-screen w-72 border-r-2 border-on-background bg-surface flex flex-col shrink-0"><div className="px-6 pt-7 pb-5 border-b border-outline-variant"><h1 className="font-headline-md text-headline-md text-primary font-bold">WorkBuddy</h1><p className="text-xs text-on-surface-variant mt-1">{user.companyName||'Company workspace'}</p><span className="inline-block bg-primary-container text-on-primary-container border border-on-background px-2 py-1 text-[10px] font-bold uppercase mt-3">{roleLabels[role]||role}</span></div><nav className="flex-1 overflow-y-auto px-4 py-4 space-y-1">{navItems.map(nav=><NavLink key={`${nav.to}-${nav.label}`} to={nav.to} end={nav.to==='/' } className={({isActive})=>isActive?'flex items-center gap-3 px-3 py-2.5 text-primary font-bold border-2 border-on-background bg-primary-container rounded-lg shadow-[2px_2px_0_rgba(28,27,27,.12)]':'flex items-center gap-3 px-3 py-2.5 text-on-surface-variant hover:bg-surface-container-high rounded-lg transition-colors'}><span className="material-symbols-outlined text-[21px]">{nav.icon}</span><span className="text-sm">{nav.label}</span></NavLink>)}</nav><div className="p-4 border-t border-outline-variant space-y-2"><button onClick={onNewClick} className="w-full py-3 bg-primary-container text-on-primary-container border-2 border-on-background font-bold flex justify-center items-center gap-2"><span className="material-symbols-outlined">add_circle</span>New item</button><button onClick={logout} className="w-full py-2 border-2 border-on-background hover:bg-error-container flex justify-center items-center gap-2 text-xs font-bold"><span className="material-symbols-outlined text-sm">logout</span>Log out</button></div></aside>;
+};
 export default Sidebar;

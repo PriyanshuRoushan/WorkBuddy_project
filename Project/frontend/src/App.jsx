@@ -14,6 +14,7 @@ import Support from './pages/Support';
 import Profile from './pages/Profile';
 import Settings from './pages/Settings';
 import ProjectWorkspace from './pages/ProjectWorkspace';
+import FeaturePlaceholder from './pages/FeaturePlaceholder';
 
 // Route Guard component
 const AuthGuard = ({ children }) => {
@@ -53,6 +54,10 @@ function App() {
           <Route path="support" element={<Support />} />
           <Route path="settings" element={<Settings />} />
           <Route path="profile" element={<Profile />} />
+          <Route path="attendance" element={<FeaturePlaceholder />} />
+          <Route path="reports" element={<FeaturePlaceholder />} />
+          <Route path="organization-settings" element={<FeaturePlaceholder />} />
+          <Route path="hr-roles" element={<FeaturePlaceholder />} />
           
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/" replace />} />

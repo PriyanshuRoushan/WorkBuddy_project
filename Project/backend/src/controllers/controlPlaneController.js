@@ -14,7 +14,8 @@ export const getSubscription = async (req, res) => {
 };
 
 export const listSupportTickets = async (req, res) => {
-  res.json(await SupportTicket.find({ companyId: req.company._id }).sort({ updatedAt: -1 }));
+  const canSeeCompanyTickets = ['CEO', 'HR'].includes(req.user.accessRole);
+  res.json(await SupportTicket.find({ companyId: req.company._id, ...(!canSeeCompanyTickets && { openedByTenantUserId: req.user._id }) }).sort({ updatedAt: -1 }));
 };
 
 export const createSupportTicket = async (req, res) => {
@@ -27,8 +28,9 @@ export const createSupportTicket = async (req, res) => {
 };
 
 export const addTicketMessage = async (req, res) => {
+  const canSeeCompanyTickets = ['CEO', 'HR'].includes(req.user.accessRole);
   const ticket = await SupportTicket.findOneAndUpdate(
-    { _id: req.params.id, companyId: req.company._id },
+    { _id: req.params.id, companyId: req.company._id, ...(!canSeeCompanyTickets && { openedByTenantUserId: req.user._id }) },
     { $push: { messages: { authorType: 'COMPANY', authorId: req.user._id, authorName: req.user.name, message: req.body.message } } }, { new: true }
   );
   if (!ticket) return res.status(404).json({ message: 'Support ticket not found' });
