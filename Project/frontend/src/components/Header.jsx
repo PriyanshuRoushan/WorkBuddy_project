@@ -23,9 +23,10 @@ const Header = ({ searchQuery, setSearchQuery }) => {
       <div className="flex items-center gap-6">
         <button className="material-symbols-outlined text-on-surface-variant hover:text-primary transition-colors hover:jiggle cursor-pointer">notifications</button>
         <button className="material-symbols-outlined text-on-surface-variant hover:text-primary transition-colors hover:jiggle cursor-pointer">help_outline</button>
-        <Link to="/profile" className="flex items-center gap-3 border-l-2 border-on-background pl-6" title="Open profile">
+        <Link to="/profile" className="flex items-center gap-3 border-l-2 border-on-background pl-6 hover:text-primary transition-colors" title="Open profile" aria-label="Open my profile">
           <span className="font-bold text-xs text-on-surface-variant font-annotation hidden sm:inline">{userName}</span>
           <Avatar name={userName} src={user?.profileImage} className="shadow-[2px_2px_0px_0px_#1c1b1b]" />
+          <span className="material-symbols-outlined text-sm">expand_more</span>
         </Link>
       </div>
     </header>
