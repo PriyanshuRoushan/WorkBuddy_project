@@ -26,7 +26,20 @@ try {
   const databaseName = `workbuddy_company_${crypto.randomBytes(8).toString('hex')}`;
   const email = process.env.PROVISION_EMAIL.trim().toLowerCase();
   if (await Company.exists({ $or: [{ slug }, { ownerEmail: email }] })) throw new Error('Company or owner email already exists');
-  const company = await Company.create({ name: companyName, slug, databaseName, ownerEmail: email, status: 'PROVISIONING' });
+  const companyObjectId = new mongoose.Types.ObjectId();
+  const companyId = `WB-CMP-${companyObjectId.toString().slice(-8).toUpperCase()}`;
+  const company = await Company.create({
+    _id: companyObjectId,
+    companyId,
+    name: companyName,
+    slug,
+    databaseName,
+    ownerEmail: email,
+    owner: { name: process.env.PROVISION_NAME.trim(), email },
+    contactEmail: email,
+    subscription: { plan: 'TRIAL', status: 'TRIAL', seats: 10, provider: 'manual' },
+    status: 'PROVISIONING'
+  });
   const tenant = getTenantModels(databaseName, modelDefinitions);
   let user;
   await runWithTenant({ ...tenant, company }, async () => {
@@ -40,6 +53,8 @@ try {
   });
   await Identity.create({ email, companyId: company._id, tenantUserId: user._id, status: 'ACTIVE' });
   await Subscription.create({ companyId: company._id, plan: 'TRIAL', status: 'TRIAL', seats: 10 });
+  company.owner.tenantUserId = user._id;
+  company.metrics = { users: 1, projects: 0, lastSyncedAt: new Date() };
   company.status = 'ACTIVE'; company.provisionedAt = new Date(); await company.save();
   console.log(`Provisioned ${user.accessRole} ${user.email} (${user.employeeId})`);
 } catch (error) {

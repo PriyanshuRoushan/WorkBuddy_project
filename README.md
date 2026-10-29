@@ -97,6 +97,13 @@ MAIL_REPLY_TO=teamworkbuddy@proton.me
 
 When `RESEND_API_KEY` is absent, invitations are not emailed and the development invite URL is returned to the CEO/HR screen and printed by the backend. During development, Resend's `onboarding@resend.dev` test sender is used and replies are directed to `MAIL_REPLY_TO`. In production, configure a Resend API key and change `MAIL_FROM` to an address on a domain verified in Resend.
 
+The `workbuddy_control` database is the platform registry. Its `control_companies` collection stores the public company ID, owner, subscription summary, lifecycle status, tenant database name, contact information, and synchronized user/project counts. Each company's operational data remains isolated in its own tenant database. Synchronize existing registry records with:
+
+```bash
+cd Project/backend
+npm run sync:companies
+```
+
 ### 3. Configure the frontend
 
 Create `Project/frontend/.env`:
