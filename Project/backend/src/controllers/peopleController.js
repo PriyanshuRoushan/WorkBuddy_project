@@ -5,7 +5,7 @@ import Invitation from '../models/Invitation.js';
 import Activity from '../models/Activity.js';
 import { generateEmployeeId } from '../utils/employeeId.js';
 import { sendInvitationEmail } from '../utils/mailer.js';
-import { ACCESS_ROLES } from '../config/accessControl.js';
+import { ACCESS_ROLES, isRoleBelow } from '../config/accessControl.js';
 import Identity from '../control/Identity.js';
 
 const safeFields = '-password';
@@ -24,6 +24,9 @@ export const invitePerson = async (req, res) => {
   const { name, email, accessRole = 'EMPLOYEE', jobTitle = 'Employee', department = '', team = '', managerId = null } = req.body;
   if (!name?.trim() || !email?.trim()) return res.status(400).json({ message: 'Name and email are required' });
   if (!ACCESS_ROLES.includes(accessRole)) return res.status(400).json({ message: 'Invalid access role' });
+  if (!isRoleBelow(req.user.accessRole, accessRole)) {
+    return res.status(403).json({ message: 'You can only invite employees with a role below your own' });
+  }
   try {
     const normalizedEmail = email.trim().toLowerCase();
     if (await User.exists({ organizationId: req.user.organizationId, email: normalizedEmail })) {
@@ -72,11 +75,20 @@ export const updatePerson = async (req, res) => {
   try {
     const user = await User.findOne({ _id: req.params.id, organizationId: req.user.organizationId });
     if (!user) return res.status(404).json({ message: 'Employee not found' });
+    if (!isRoleBelow(req.user.accessRole, user.accessRole)) {
+      return res.status(403).json({ message: 'You cannot manage an employee at your level or above' });
+    }
     if (req.user.accessRole === 'TEAM_HEAD') {
       if (!req.user.team || user.team !== req.user.team) return res.status(403).json({ message: 'Team Heads can update job titles only within their own team' });
       user.jobTitle = req.body.jobTitle ?? user.jobTitle;
       await user.save();
       return res.json(await user.populate('managerId', 'name employeeId'));
+    }
+    if (req.body.accessRole !== undefined) {
+      if (!ACCESS_ROLES.includes(req.body.accessRole)) return res.status(400).json({ message: 'Invalid access role' });
+      if (!isRoleBelow(req.user.accessRole, req.body.accessRole)) {
+        return res.status(403).json({ message: 'You cannot assign a role at your level or above' });
+      }
     }
     const previousAssignment = { managerId: user.managerId, department: user.department, team: user.team };
     const allowed = ['accessRole', 'jobTitle', 'department', 'team'];
@@ -100,10 +112,13 @@ export const setAccountStatus = async (req, res) => {
   if (!['ACTIVE', 'SUSPENDED'].includes(accountStatus)) return res.status(400).json({ message: 'Invalid account status' });
   if (String(req.user._id) === req.params.id) return res.status(400).json({ message: 'You cannot suspend your own account' });
   try {
-    const user = await User.findOneAndUpdate(
-      { _id: req.params.id, organizationId: req.user.organizationId }, { accountStatus }, { new: true, runValidators: true }
-    ).select(safeFields);
+    const user = await User.findOne({ _id: req.params.id, organizationId: req.user.organizationId }).select(safeFields);
     if (!user) return res.status(404).json({ message: 'Employee not found' });
+    if (!isRoleBelow(req.user.accessRole, user.accessRole)) {
+      return res.status(403).json({ message: 'You cannot suspend or restore an employee at your level or above' });
+    }
+    user.accountStatus = accountStatus;
+    await user.save();
     if (accountStatus === 'SUSPENDED') await Invitation.updateMany({ userId: user._id, acceptedAt: null }, { revokedAt: new Date() });
     if (req.company) await Identity.updateOne({ companyId: req.company._id, tenantUserId: user._id }, { status: accountStatus });
     res.json(user);
