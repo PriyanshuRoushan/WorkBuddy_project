@@ -44,7 +44,19 @@ export const invitePerson = async (req, res) => {
     const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:5173').split(',')[0].trim();
     const inviteUrl = `${frontendUrl}/accept-invite/${rawToken}`;
     let mail;
-    try { mail = await sendInvitationEmail({ to: normalizedEmail, name: user.name, inviterName: req.user.name, inviteUrl, expiresAt }); }
+    try {
+      mail = await sendInvitationEmail({
+        to: normalizedEmail,
+        name: user.name,
+        companyName: organization.name,
+        employeeRole: user.jobTitle || user.accessRole,
+        inviterName: req.user.displayName || req.user.name,
+        inviterDesignation: req.user.jobTitle || req.user.accessRole,
+        contactEmail: req.company?.ownerEmail || req.user.email || process.env.MAIL_REPLY_TO,
+        inviteUrl,
+        expiresAt
+      });
+    }
     catch (error) {
       await Invitation.deleteOne({ tokenHash });
       if (req.company) await Identity.deleteOne({ companyId: req.company._id, tenantUserId: user._id });
