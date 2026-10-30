@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { login } from '../services/api';
+import { login, restoreSession } from '../services/api';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -9,6 +9,15 @@ const Login = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (localStorage.getItem('token')) return navigate('/', { replace: true });
+    restoreSession().then(data => {
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('user', JSON.stringify(data));
+      navigate('/', { replace: true });
+    }).catch(() => {});
+  }, [navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

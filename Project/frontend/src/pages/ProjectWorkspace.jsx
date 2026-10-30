@@ -126,7 +126,8 @@ const ProjectWorkspace = () => {
 
         // 5. Establish Socket.IO Connection
         socketRef.current = io(CONSTANT.API_URL.replace(/\/$/, ''), {
-          auth: { token }
+          auth: { token },
+          withCredentials: true
         });
 
         // Rejoin after every connection, including automatic reconnects after a backend restart.

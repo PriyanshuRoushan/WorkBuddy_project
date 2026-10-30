@@ -16,6 +16,24 @@ const generateToken = (id, companyId) => {
   });
 };
 
+const sessionCookieBaseOptions = () => ({
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+  path: '/'
+});
+
+const sessionCookieOptions = () => ({
+  ...sessionCookieBaseOptions(),
+  maxAge: 30 * 24 * 60 * 60 * 1000
+});
+
+const attachSession = (res, user, company) => {
+  const token = generateToken(user._id, company._id);
+  res.cookie('workbuddy_session', token, sessionCookieOptions());
+  return token;
+};
+
 const publicUser = user => ({
   _id: user._id,
   name: user.name,
@@ -66,7 +84,7 @@ export const acceptInvitation = async (req, res) => {
       user.password = password; user.accountStatus = 'ACTIVE'; await user.save();
       invitation.acceptedAt = new Date(); await invitation.save();
       identity.status = 'ACTIVE'; identity.invitationTokenHash = undefined; await identity.save();
-      res.json({ ...publicUser(user), companyId: company._id, token: generateToken(user._id, company._id) });
+      res.json({ ...publicUser(user), companyId: company._id, token: attachSession(res, user, company) });
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -88,12 +106,22 @@ export const loginUser = async (req, res) => {
       const user = await User.findById(identity.tenantUserId).select('+password');
       if (user?.accountStatus === 'PENDING') return res.status(403).json({ message: 'Accept your email invitation and create a password first' });
       if (user?.accountStatus === 'SUSPENDED') return res.status(403).json({ message: 'Your account has been suspended. Contact HR or your CEO.' });
-      if (user && await user.matchPassword(password)) return res.json({ ...publicUser(user), companyId: company._id, companyName: company.name, token: generateToken(user._id, company._id) });
+      if (user && await user.matchPassword(password)) return res.json({ ...publicUser(user), companyId: company._id, companyName: company.name, token: attachSession(res, user, company) });
       res.status(401).json({ message: 'Invalid email or password' });
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
+};
+
+export const restoreSession = async (req, res) => {
+  const token = attachSession(res, req.user, req.company);
+  res.json({ ...publicUser(req.user), companyId: req.company._id, companyName: req.company.name, token });
+};
+
+export const logoutUser = (req, res) => {
+  res.clearCookie('workbuddy_session', sessionCookieBaseOptions());
+  res.json({ message: 'Logged out' });
 };
 
 export const getMe = async (req, res) => {
@@ -172,7 +200,7 @@ export const updateProfile = async (req, res) => {
       notifySparks: updatedUser.notifySparks,
       notifyScribbles: updatedUser.notifyScribbles,
       themePreference: updatedUser.themePreference,
-      token: generateToken(updatedUser._id, req.company?._id)
+      token: attachSession(res, updatedUser, req.company)
     });
   } catch (error) {
     res.status(500).json({ message: error.message });

@@ -11,11 +11,16 @@ import { getTenantModels, runWithTenant } from './tenancy/tenantContext.js';
 import { modelDefinitions } from './tenancy/modelRegistry.js';
 
 const jwtSecret = () => process.env.JWT_SECRET || 'doodlesaas_super_secret_key';
+const sessionFromCookies = header => header
+  ?.split(';')
+  .map(cookie => cookie.trim())
+  .find(cookie => cookie.startsWith('workbuddy_session='))
+  ?.slice('workbuddy_session='.length);
 
 export default (io) => {
   io.use(async (socket, next) => {
     try {
-      const token = socket.handshake.auth?.token;
+      const token = socket.handshake.auth?.token || decodeURIComponent(sessionFromCookies(socket.handshake.headers.cookie) || '');
       if (!token) return next(new Error('Authentication required'));
 
       const decoded = jwt.verify(token, jwtSecret());

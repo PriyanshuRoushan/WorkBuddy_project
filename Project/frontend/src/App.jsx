@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
@@ -15,14 +16,25 @@ import Profile from './pages/Profile';
 import Settings from './pages/Settings';
 import ProjectWorkspace from './pages/ProjectWorkspace';
 import FeaturePlaceholder from './pages/FeaturePlaceholder';
+import { restoreSession } from './services/api';
 
 // Route Guard component
 const AuthGuard = ({ children }) => {
-  const token = localStorage.getItem('token');
-  if (!token) {
-    return <Navigate to="/login" replace />;
-  }
-  return children;
+  const [status, setStatus] = useState('checking');
+  useEffect(() => {
+    let active = true;
+    restoreSession().then(data => {
+      if (!active) return;
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('user', JSON.stringify(data));
+      setStatus('authenticated');
+    }).catch(() => {
+      if (active) setStatus('anonymous');
+    });
+    return () => { active = false; };
+  }, []);
+  if (status === 'checking') return <div className="min-h-screen grid place-items-center bg-background font-bold">Restoring your workspace…</div>;
+  return status === 'authenticated' ? children : <Navigate to="/login" replace />;
 };
 
 function App() {

@@ -2,6 +2,7 @@ import axios from 'axios';
 import {CONSTANT} from '../../constant';
 const api = axios.create({
   baseURL: `${CONSTANT.API_URL.replace(/\/$/, '')}/api`,
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json'
   }
@@ -28,7 +29,9 @@ api.interceptors.response.use(
     if (error.response && error.response.status === 401) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
-      if (typeof window !== 'undefined') {
+      const isSessionProbe = error.config?.url === '/auth/session';
+      const isLoginPage = typeof window !== 'undefined' && window.location.pathname === '/login';
+      if (typeof window !== 'undefined' && !isSessionProbe && !isLoginPage) {
         window.location.href = '/login';
       }
     }
@@ -39,6 +42,8 @@ api.interceptors.response.use(
 // Authentication endpoints
 export const login = (email, password, companySlug) =>
   api.post('/auth/login', { email, password, companySlug: companySlug || undefined }).then(res => res.data);
+export const restoreSession = () => api.get('/auth/session').then(res => res.data);
+export const logout = () => api.post('/auth/logout').then(res => res.data);
 
 export const inspectInvitation = token => api.get(`/auth/invitations/${token}`).then(res => res.data);
 export const acceptInvitation = (token, password) => api.post(`/auth/invitations/${token}/accept`, { password }).then(res => res.data);

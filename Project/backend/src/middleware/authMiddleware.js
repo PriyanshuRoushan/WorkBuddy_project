@@ -7,10 +7,16 @@ import { getTenantModels, runWithTenant } from '../tenancy/tenantContext.js';
 import { modelDefinitions } from '../tenancy/modelRegistry.js';
 
 export const protect = async (req, res, next) => {
-  let token;
-  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
-    try {
-      token = req.headers.authorization.split(' ')[1];
+  const cookieToken = req.headers.cookie
+    ?.split(';')
+    .map(cookie => cookie.trim())
+    .find(cookie => cookie.startsWith('workbuddy_session='))
+    ?.slice('workbuddy_session='.length);
+  try {
+    const token = req.headers.authorization?.startsWith('Bearer ')
+      ? req.headers.authorization.split(' ')[1]
+      : cookieToken ? decodeURIComponent(cookieToken) : null;
+    if (token) {
       const decoded = jwt.verify(token, process.env.JWT_SECRET || 'doodlesaas_super_secret_key');
       
       const company = decoded.companyId ? await Company.findById(decoded.companyId) : null;
@@ -31,12 +37,12 @@ export const protect = async (req, res, next) => {
         }
         next();
       });
-    } catch (error) {
-      console.error('Token validation error:', error);
-      res.status(401).json({ message: 'Not authorized, token failed' });
+    } else {
+      res.status(401).json({ message: 'Not authorized, no token provided' });
     }
-  } else {
-    res.status(401).json({ message: 'Not authorized, no token provided' });
+  } catch (error) {
+    console.error('Token validation error:', error);
+    res.status(401).json({ message: 'Not authorized, token failed' });
   }
 };
 export const requireProjectManager = (req, res, next) => {
