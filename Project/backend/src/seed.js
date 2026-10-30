@@ -439,10 +439,18 @@ const seedData = async () => {
 
     if (phoenix && urban && lunar && solstice) {
       // 1. Create Chat Rooms
-      const roomPhoenix = await ChatRoom.create({ organizationId: organization._id, projectId: phoenix._id, name: 'Phoenix Rebrand Collaboration Chat' });
-      const roomUrban = await ChatRoom.create({ organizationId: organization._id, projectId: urban._id, name: 'Urban Oasis App Collaboration Chat' });
-      const roomLunar = await ChatRoom.create({ organizationId: organization._id, projectId: lunar._id, name: 'Lunar Coffee Branding Collaboration Chat' });
-      const roomSolstice = await ChatRoom.create({ organizationId: organization._id, projectId: solstice._id, name: 'The Solstice Project Collaboration Chat' });
+      const createGeneralChannel = project => ChatRoom.create({
+        organizationId: organization._id, projectId: project._id, name: 'General', slug: 'general',
+        type: 'GENERAL', description: 'Project-wide discussion and everyday updates.', createdBy: pm._id
+      });
+      const roomPhoenix = await createGeneralChannel(phoenix);
+      const roomUrban = await createGeneralChannel(urban);
+      const roomLunar = await createGeneralChannel(lunar);
+      const roomSolstice = await createGeneralChannel(solstice);
+      await ChatRoom.insertMany([phoenix, urban, lunar, solstice].map(project => ({
+        organizationId: organization._id, projectId: project._id, name: 'Announcements', slug: 'announcements',
+        type: 'ANNOUNCEMENTS', description: 'Important project updates and decisions.', createdBy: pm._id
+      })));
       console.log('Collaboration Chat Rooms seeded!');
 
       // 2. Create Project Members

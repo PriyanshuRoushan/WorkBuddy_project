@@ -1,6 +1,7 @@
 import Activity from '../models/Activity.js';
 import Announcement from '../models/Announcement.js';
 import ChatRoom from '../models/ChatRoom.js';
+import ChannelState from '../models/ChannelState.js';
 import Event from '../models/Event.js';
 import Invitation from '../models/Invitation.js';
 import Message from '../models/Message.js';
@@ -14,5 +15,5 @@ import Task from '../models/Task.js';
 import TeamMember from '../models/TeamMember.js';
 import User from '../models/User.js';
 
-const models = { Activity, Announcement, ChatRoom, Event, Invitation, Message, Organization, Project, ProjectMember, Rating, RoleTemplate, StickyNote, Task, TeamMember, User };
+const models = { Activity, Announcement, ChannelState, ChatRoom, Event, Invitation, Message, Organization, Project, ProjectMember, Rating, RoleTemplate, StickyNote, Task, TeamMember, User };
 export const modelDefinitions = Object.entries(models).map(([name, model]) => ({ name, schema: model.schema }));

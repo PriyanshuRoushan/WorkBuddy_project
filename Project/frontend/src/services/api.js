@@ -98,7 +98,13 @@ export const createStickyNote = (noteData) => api.post('/team/notes', noteData).
 export const deleteStickyNote = (id) => api.delete(`/team/notes/${id}`).then(res => res.data);
 
 // Collaboration endpoints
-export const getProjectMessages = (projectId) => api.get(`/collab/projects/${projectId}/messages`).then(res => res.data);
+export const getProjectChannels = projectId => api.get(`/collab/projects/${projectId}/channels`).then(res => res.data);
+export const createProjectChannel = (projectId, data) => api.post(`/collab/projects/${projectId}/channels`, data).then(res => res.data);
+export const updateProjectChannel = (projectId, channelId, data) => api.patch(`/collab/projects/${projectId}/channels/${channelId}`, data).then(res => res.data);
+export const deleteProjectChannel = (projectId, channelId) => api.delete(`/collab/projects/${projectId}/channels/${channelId}`).then(res => res.data);
+export const getChannelMessages = (projectId, channelId, params = {}) => api.get(`/collab/projects/${projectId}/channels/${channelId}/messages`, { params }).then(res => res.data);
+export const updateChannelState = (channelId, data) => api.patch(`/collab/channels/${channelId}/state`, data).then(res => res.data);
+export const toggleMessageBookmark = messageId => api.post(`/collab/messages/${messageId}/bookmark`).then(res => res.data);
 export const uploadFile = (formData) => api.post('/collab/upload', formData, {
   headers: {
     'Content-Type': 'multipart/form-data'

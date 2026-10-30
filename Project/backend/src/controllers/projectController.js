@@ -93,12 +93,28 @@ export const createProject = async (req, res) => {
       creatorId: req.user._id
     });
 
-    await ChatRoom.create({
-      organizationId: req.user.organizationId,
-      projectId: project._id,
-      name: `${title} Collaboration Chat`,
-      participants: [req.user._id]
-    });
+    await ChatRoom.insertMany([
+      {
+        organizationId: req.user.organizationId,
+        projectId: project._id,
+        name: 'General',
+        slug: 'general',
+        description: 'Project-wide discussion and everyday updates.',
+        type: 'GENERAL',
+        createdBy: req.user._id,
+        participants: [req.user._id]
+      },
+      {
+        organizationId: req.user.organizationId,
+        projectId: project._id,
+        name: 'Announcements',
+        slug: 'announcements',
+        description: 'Important project updates and decisions.',
+        type: 'ANNOUNCEMENTS',
+        createdBy: req.user._id,
+        participants: [req.user._id]
+      }
+    ]);
 
     const collaboratorUsers = await resolveUsers(req.user.organizationId, collaborators);
     const members = [
@@ -235,7 +251,7 @@ export const deleteProject = async (req, res) => {
     }
 
     await Project.deleteOne({ _id: project._id });
-    await ChatRoom.findOneAndDelete(tenantFilter(req, { projectId: project._id }));
+    await ChatRoom.deleteMany(tenantFilter(req, { projectId: project._id }));
     await ProjectMember.deleteMany(tenantFilter(req, { projectId: project._id }));
 
     await Activity.create({

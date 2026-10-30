@@ -12,6 +12,7 @@
     "sync:companies": "node src/sync-company-registry.js",
     "migrate:control-db": "node src/migrate-control-database.js",
     "migrate:remove-project-notes": "node src/remove-project-notes.js",
+    "migrate:project-channels": "node src/migrate-project-channels.js",
     "provision:admin": "node src/provision-admin.js",
     "provision:support": "node src/provision-support-agent.js"
   },

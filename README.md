@@ -9,8 +9,8 @@ WorkBuddy is a full-stack team collaboration and project management app with a s
 - Targeted announcements with priorities, pinning, read state, and audience controls
 - Project creation, progress tracking, and collaborator management
 - Personal and project tasks with statuses, categories, assignees, and due dates
-- Project chat with replies, reactions, mentions, typing indicators, and read receipts
-- Project workspaces with real-time chat, file sharing, and task management
+- Channel-based project communication with General, Announcements, and custom public channels
+- Real-time messages with sender avatars, replies, reactions, mentions, files, editing, pinning, bookmarks, decisions, and task conversion
 - File attachments in project conversations
 - Team directory, team wall notes, calendar events, and activity feeds
 - Organization-scoped records and project membership checks
@@ -191,7 +191,7 @@ There is no automated test suite configured; the backend `test` script is a plac
 
 The React app sends REST requests through `src/services/api.js`. The client attaches the JWT from localStorage and redirects to login on a `401` response. Express routes authenticate requests, call controllers, and persist data through Mongoose.
 
-Each project workspace loads project details, messages, and tasks through REST, then connects to an authenticated Socket.IO project room. Chat messages are persisted by socket handlers. Task changes are saved through REST and relayed to other clients through socket events.
+Each project workspace loads its public channels and paginated history through REST, then joins the selected authenticated Socket.IO channel. General and Announcements are created automatically; members can add public custom channels. Per-user channel state stores notification preferences, bookmarks, unread progress, and the project-join boundary used for unread counts. Current project members retain access to all public history while removed members immediately lose access.
 
 ### Multi-company database isolation
 

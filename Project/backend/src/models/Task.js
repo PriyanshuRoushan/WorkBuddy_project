@@ -45,6 +45,15 @@ const taskSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Project'
   },
+  priority: {
+    type: String,
+    enum: ['LOW', 'MEDIUM', 'HIGH', 'URGENT'],
+    default: 'MEDIUM'
+  },
+  sourceMessageId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Message'
+  },
   requiredSkills: {
     type: [String],
     default: []

@@ -2,6 +2,7 @@ import Task from '../models/Task.js';
 import User from '../models/User.js';
 import ProjectMember from '../models/ProjectMember.js';
 import Activity from '../models/Activity.js';
+import Message from '../models/Message.js';
 import { tenantFilter } from '../utils/tenant.js';
 import { hasGlobalAccess } from '../config/accessControl.js';
 
@@ -59,7 +60,9 @@ export const createTask = async (req, res) => {
     assignedTo,
     projectId,
     requiredSkills,
-    complexityScore
+    complexityScore,
+    priority,
+    sourceMessageId
   } = req.body;
 
   try {
@@ -80,9 +83,18 @@ export const createTask = async (req, res) => {
       assignedTo: assignee._id,
       assignedToEmail: assignee.email,
       projectId,
+      priority,
+      sourceMessageId,
       requiredSkills,
       complexityScore
     });
+
+    if (sourceMessageId) {
+      await Message.updateOne(
+        { _id: sourceMessageId, organizationId: req.user.organizationId },
+        { $set: { taskId: task._id } }
+      );
+    }
 
     await Activity.create({
       organizationId: req.user.organizationId,

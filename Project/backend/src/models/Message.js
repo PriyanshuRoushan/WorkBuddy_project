@@ -29,6 +29,7 @@ const messageSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  senderAvatar: { type: String, default: '' },
   content: {
     type: String,
     default: ''
@@ -54,6 +55,11 @@ const messageSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Message'
   },
+  isPinned: { type: Boolean, default: false, index: true },
+  isDecision: { type: Boolean, default: false, index: true },
+  taskId: { type: mongoose.Schema.Types.ObjectId, ref: 'Task' },
+  editedAt: Date,
+  deletedAt: Date,
   readBy: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'

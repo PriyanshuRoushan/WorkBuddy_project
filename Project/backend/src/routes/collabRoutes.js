@@ -3,7 +3,16 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
-import { getMessages, uploadFile } from '../controllers/collabController.js';
+import {
+  createChannel,
+  deleteChannel,
+  getChannels,
+  getMessages,
+  toggleBookmark,
+  updateChannel,
+  updateChannelState,
+  uploadFile
+} from '../controllers/collabController.js';
 import { protect } from '../middleware/authMiddleware.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -48,7 +57,15 @@ const upload = multer({
 
 const router = express.Router();
 
-router.get('/projects/:projectId/messages', protect, getMessages);
+router.route('/projects/:projectId/channels')
+  .get(protect, getChannels)
+  .post(protect, createChannel);
+router.route('/projects/:projectId/channels/:channelId')
+  .patch(protect, updateChannel)
+  .delete(protect, deleteChannel);
+router.get('/projects/:projectId/channels/:channelId/messages', protect, getMessages);
+router.patch('/channels/:channelId/state', protect, updateChannelState);
+router.post('/messages/:messageId/bookmark', protect, toggleBookmark);
 router.post('/upload', protect, upload.single('file'), uploadFile);
 
 export default router;
