@@ -9,6 +9,23 @@ import Identity from '../control/Identity.js';
 
 const safeFields = '-password';
 
+const validateReportingManager = async (organizationId, managerId, employeeRole, employeeId = null) => {
+  if (!managerId) return null;
+  if (employeeId && String(managerId) === String(employeeId)) {
+    throw new Error('An employee cannot report to themselves');
+  }
+  const manager = await User.findOne({
+    _id: managerId,
+    organizationId,
+    accountStatus: { $ne: 'SUSPENDED' }
+  }).select('accessRole');
+  if (!manager) throw new Error('Reporting manager was not found in this company');
+  if (!isRoleBelow(manager.accessRole, employeeRole)) {
+    throw new Error('The reporting manager must hold a higher position than the employee');
+  }
+  return manager;
+};
+
 export const listPeople = async (req, res) => {
   try {
     const users = await User.find({ organizationId: req.user.organizationId })
@@ -32,6 +49,7 @@ export const invitePerson = async (req, res) => {
       return res.status(409).json({ message: 'A user with this email already exists' });
     }
     const organization = await Organization.findById(req.user.organizationId);
+    await validateReportingManager(organization._id, managerId, accessRole);
     const employeeId = await generateEmployeeId(organization);
     const user = await User.create({
       organizationId: organization._id, name: name.trim(), email: normalizedEmail,
@@ -88,6 +106,9 @@ export const updatePerson = async (req, res) => {
         return res.status(403).json({ message: 'You cannot assign a role at your level or above' });
       }
     }
+    const resultingRole = req.body.accessRole ?? user.accessRole;
+    const resultingManagerId = req.body.managerId !== undefined ? req.body.managerId : user.managerId;
+    await validateReportingManager(req.user.organizationId, resultingManagerId, resultingRole, user._id);
     const previousAssignment = { managerId: user.managerId, department: user.department, team: user.team };
     const allowed = ['accessRole', 'jobTitle', 'department', 'team'];
     for (const field of allowed) if (req.body[field] !== undefined) user[field] = req.body[field];

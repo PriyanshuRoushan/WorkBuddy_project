@@ -7,6 +7,8 @@ import ProjectMember from '../models/ProjectMember.js';
 import { tenantFilter } from '../utils/tenant.js';
 import { hasGlobalAccess } from '../config/accessControl.js';
 
+const routineTaskAction = /^(created a new task|moved task to |completed task|deleted task)/;
+
 const visibleAnnouncementQuery = async user => {
   if (hasGlobalAccess(user)) return {};
   const projectIds = await ProjectMember.find({
@@ -24,15 +26,22 @@ const visibleAnnouncementQuery = async user => {
 
 export const getActivities = async (req, res) => {
   try {
-    let query = tenantFilter(req, { action: { $ne: 'invited employee' } });
+    const activityFilters = [
+      { action: { $ne: 'invited employee' } },
+      {
+        $or: [
+          { actorId: req.user._id },
+          { action: { $not: routineTaskAction } }
+        ]
+      }
+    ];
     if (req.user && !hasGlobalAccess(req.user)) {
       const firstName = req.user.name.split(' ')[0];
       const memberProjectIds = await ProjectMember.find({
         organizationId: req.user.organizationId,
         userId: req.user._id
       }).distinct('projectId');
-      query = tenantFilter(req, {
-        action: { $ne: 'invited employee' },
+      activityFilters.push({
         $or: [
           { user: firstName },
           { user: 'System' },
@@ -40,6 +49,7 @@ export const getActivities = async (req, res) => {
         ]
       });
     }
+    const query = tenantFilter(req, { $and: activityFilters });
     const announcementVisibility = await visibleAnnouncementQuery(req.user);
     const accessibleProjectIds = hasGlobalAccess(req.user)
       ? await ChatRoom.find({ organizationId: req.user.organizationId }).distinct('projectId')
