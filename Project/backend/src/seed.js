@@ -9,7 +9,6 @@ import TeamMember from './models/TeamMember.js';
 import StickyNote from './models/StickyNote.js';
 import ChatRoom from './models/ChatRoom.js';
 import Message from './models/Message.js';
-import ProjectNote from './models/ProjectNote.js';
 import ProjectMember from './models/ProjectMember.js';
 import Organization from './models/Organization.js';
 import RoleTemplate from './models/RoleTemplate.js';
@@ -32,7 +31,6 @@ const seedData = async () => {
     await StickyNote.deleteMany();
     await ChatRoom.deleteMany();
     await Message.deleteMany();
-    await ProjectNote.deleteMany();
     await ProjectMember.deleteMany();
     await RoleTemplate.deleteMany();
     await Rating.deleteMany();
@@ -491,7 +489,7 @@ const seedData = async () => {
         senderId: uiux._id,
         senderName: uiux.name,
         senderRole: uiux.role,
-        content: "Already on it! I've uploaded the new typography guidelines on the whiteboard.",
+        content: "Already on it! I've uploaded the new typography guidelines in the project chat.",
         replyTo: m1._id,
         readBy: [pm._id, frontend._id, uiux._id]
       });
@@ -518,51 +516,6 @@ const seedData = async () => {
       });
       console.log('Collaboration Messages seeded!');
 
-      // 4. Create Project Notes (Whiteboard notes)
-      await ProjectNote.create({
-        organizationId: organization._id,
-        noteId: 'note-phoenix-1',
-        projectId: phoenix._id,
-        createdBy: uiux.name,
-        createdByUserId: uiux._id,
-        content: "Typography Guidelines:\n- Primary: Outfit (700 for headings)\n- Body: Inter (400)\n- Keep spacing tight & clean",
-        positionX: 120,
-        positionY: 80,
-        width: 220,
-        height: 180,
-        color: 'tertiary-container',
-        isPinned: true
-      });
-      await ProjectNote.create({
-        organizationId: organization._id,
-        noteId: 'note-phoenix-2',
-        projectId: phoenix._id,
-        createdBy: pm.name,
-        createdByUserId: pm._id,
-        content: "Sprint 1 Goals:\n- Modernize logo vector\n- Finalize color tokens\n- Draft Figma component set",
-        positionX: 400,
-        positionY: 100,
-        width: 220,
-        height: 180,
-        color: 'primary-container',
-        isPinned: false
-      });
-
-      await ProjectNote.create({
-        organizationId: organization._id,
-        noteId: 'note-urban-1',
-        projectId: urban._id,
-        createdBy: uiux.name,
-        createdByUserId: uiux._id,
-        content: "Figma wireframe link: https://figma.com/file/urban-oasis-mockups",
-        positionX: 100,
-        positionY: 100,
-        width: 220,
-        height: 150,
-        color: 'secondary-container',
-        isPinned: false
-      });
-      console.log('Project Notes seeded!');
     }
 
     console.log('Data successfully seeded! Exiting...');

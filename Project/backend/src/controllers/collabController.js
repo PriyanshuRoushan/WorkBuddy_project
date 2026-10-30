@@ -1,6 +1,5 @@
 import ChatRoom from '../models/ChatRoom.js';
 import Message from '../models/Message.js';
-import ProjectNote from '../models/ProjectNote.js';
 import ProjectMember from '../models/ProjectMember.js';
 import { tenantFilter } from '../utils/tenant.js';
 import { hasGlobalAccess } from '../config/accessControl.js';
@@ -35,19 +34,6 @@ export const getMessages = async (req, res) => {
       .populate('replyTo')
       .sort({ createdAt: 1 });
     res.json({ room, messages });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-export const getNotes = async (req, res) => {
-  const { projectId } = req.params;
-  try {
-    if (!(await canAccessProject(req, projectId))) {
-      return res.status(403).json({ message: 'Access denied: You are not a project member' });
-    }
-    const notes = await ProjectNote.find(tenantFilter(req, { projectId }));
-    res.json(notes);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

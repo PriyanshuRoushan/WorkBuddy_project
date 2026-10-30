@@ -3,7 +3,7 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
-import { getMessages, getNotes, uploadFile } from '../controllers/collabController.js';
+import { getMessages, uploadFile } from '../controllers/collabController.js';
 import { protect } from '../middleware/authMiddleware.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -49,7 +49,6 @@ const upload = multer({
 const router = express.Router();
 
 router.get('/projects/:projectId/messages', protect, getMessages);
-router.get('/projects/:projectId/notes', protect, getNotes);
 router.post('/upload', protect, upload.single('file'), uploadFile);
 
 export default router;

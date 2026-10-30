@@ -1,7 +1,6 @@
 import jwt from 'jsonwebtoken';
 import ProjectMember from './models/ProjectMember.js';
 import Message from './models/Message.js';
-import ProjectNote from './models/ProjectNote.js';
 import ChatRoom from './models/ChatRoom.js';
 import User from './models/User.js';
 import { getOrCreateDefaultOrganization } from './utils/tenant.js';
@@ -203,78 +202,6 @@ export default (io) => {
         });
       } catch (error) {
         console.error('Socket message-reaction error:', error);
-      }
-    });
-
-    socket.on('create-note', async (noteData) => {
-      const { noteId, projectId, content, positionX, positionY, width, height, color, isPinned } = noteData;
-      if (!isActiveProject(projectId)) return;
-      try {
-        const savedNote = await ProjectNote.create({
-          organizationId: socket.user.organizationId,
-          noteId,
-          projectId,
-          createdBy: socket.user.name,
-          createdByUserId: socket.user._id,
-          content,
-          positionX,
-          positionY,
-          width,
-          height,
-          color,
-          isPinned
-        });
-        socket.to(projectId).emit('receive-create-note', savedNote);
-      } catch (error) {
-        console.error('Socket create-note error:', error);
-      }
-    });
-
-    const updateNote = async (projectId, noteId, update, eventName) => {
-      if (!isActiveProject(projectId)) return;
-      const note = await ProjectNote.findOneAndUpdate(
-        {
-          organizationId: socket.user.organizationId,
-          projectId,
-          noteId
-        },
-        update,
-        { new: true }
-      );
-      if (note) socket.to(projectId).emit(eventName, { noteId, ...update });
-    };
-
-    socket.on('move-note', ({ projectId, noteId, positionX, positionY }) => {
-      updateNote(projectId, noteId, { positionX, positionY }, 'receive-move-note')
-        .catch(error => console.error('Socket move-note error:', error));
-    });
-
-    socket.on('update-note', ({ projectId, noteId, content, color, width, height }) => {
-      const update = {};
-      if (content !== undefined) update.content = content;
-      if (color !== undefined) update.color = color;
-      if (width !== undefined) update.width = width;
-      if (height !== undefined) update.height = height;
-      updateNote(projectId, noteId, update, 'receive-update-note')
-        .catch(error => console.error('Socket update-note error:', error));
-    });
-
-    socket.on('pin-note', ({ projectId, noteId, isPinned }) => {
-      updateNote(projectId, noteId, { isPinned }, 'receive-pin-note')
-        .catch(error => console.error('Socket pin-note error:', error));
-    });
-
-    socket.on('delete-note', async ({ projectId, noteId }) => {
-      if (!isActiveProject(projectId)) return;
-      try {
-        const deleted = await ProjectNote.findOneAndDelete({
-          organizationId: socket.user.organizationId,
-          projectId,
-          noteId
-        });
-        if (deleted) socket.to(projectId).emit('receive-delete-note', { noteId });
-      } catch (error) {
-        console.error('Socket delete-note error:', error);
       }
     });
 

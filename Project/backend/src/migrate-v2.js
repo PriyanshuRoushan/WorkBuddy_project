@@ -12,7 +12,6 @@ import Event from './models/Event.js';
 import StickyNote from './models/StickyNote.js';
 import ChatRoom from './models/ChatRoom.js';
 import Message from './models/Message.js';
-import ProjectNote from './models/ProjectNote.js';
 
 dotenv.config();
 
@@ -133,7 +132,7 @@ const migrate = async () => {
     await Task.collection.updateOne({ _id: task._id }, { $set: update });
   }
 
-  const tenantModels = [Activity, Event, StickyNote, ChatRoom, Message, ProjectNote];
+  const tenantModels = [Activity, Event, StickyNote, ChatRoom, Message];
   for (const Model of tenantModels) {
     await Model.updateMany(
       { organizationId: { $exists: false } },

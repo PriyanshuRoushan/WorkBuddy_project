@@ -11,6 +11,7 @@
     "migrate:v2": "node src/migrate-v2.js",
     "sync:companies": "node src/sync-company-registry.js",
     "migrate:control-db": "node src/migrate-control-database.js",
+    "migrate:remove-project-notes": "node src/remove-project-notes.js",
     "provision:admin": "node src/provision-admin.js",
     "provision:support": "node src/provision-support-agent.js"
   },

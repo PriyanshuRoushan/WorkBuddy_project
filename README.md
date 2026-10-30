@@ -1,6 +1,6 @@
 # WorkBuddy
 
-WorkBuddy is a full-stack team collaboration and project management app with a sketchbook-inspired interface. It brings project planning, task tracking, chat, and collaborative notes into one workspace.
+WorkBuddy is a full-stack team collaboration and project management app with a sketchbook-inspired interface. It brings project planning, task tracking, and chat into one workspace.
 
 ## Features
 
@@ -10,7 +10,7 @@ WorkBuddy is a full-stack team collaboration and project management app with a s
 - Project creation, progress tracking, and collaborator management
 - Personal and project tasks with statuses, categories, assignees, and due dates
 - Project chat with replies, reactions, mentions, typing indicators, and read receipts
-- Shared whiteboard with movable, resizable, colored, and pinned sticky notes
+- Project workspaces with real-time chat, file sharing, and task management
 - File attachments in project conversations
 - Team directory, team wall notes, calendar events, and activity feeds
 - Organization-scoped records and project membership checks
@@ -191,7 +191,7 @@ There is no automated test suite configured; the backend `test` script is a plac
 
 The React app sends REST requests through `src/services/api.js`. The client attaches the JWT from localStorage and redirects to login on a `401` response. Express routes authenticate requests, call controllers, and persist data through Mongoose.
 
-Each project workspace loads project details, messages, whiteboard notes, and tasks through REST, then connects to an authenticated Socket.IO project room. Chat and whiteboard changes are persisted by socket handlers. Task changes are saved through REST and relayed to other clients through socket events.
+Each project workspace loads project details, messages, and tasks through REST, then connects to an authenticated Socket.IO project room. Chat messages are persisted by socket handlers. Task changes are saved through REST and relayed to other clients through socket events.
 
 ### Multi-company database isolation
 

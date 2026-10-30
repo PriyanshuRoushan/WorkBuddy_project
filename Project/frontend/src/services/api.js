@@ -99,7 +99,6 @@ export const deleteStickyNote = (id) => api.delete(`/team/notes/${id}`).then(res
 
 // Collaboration endpoints
 export const getProjectMessages = (projectId) => api.get(`/collab/projects/${projectId}/messages`).then(res => res.data);
-export const getProjectNotes = (projectId) => api.get(`/collab/projects/${projectId}/notes`).then(res => res.data);
 export const uploadFile = (formData) => api.post('/collab/upload', formData, {
   headers: {
     'Content-Type': 'multipart/form-data'
